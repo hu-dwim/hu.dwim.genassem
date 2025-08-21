@@ -1,0 +1,188 @@
+# -*- mode: org; coding: utf-8-unix -*-
+
+* bugs
+* code cleanup
+* knowledge base
+** x86
+*** microarchitecture levels: x86-64-v1 .. x86-64-v4
+https://en.wikipedia.org/wiki/X86-64#Microarchitecture_levels
+*** encoding and prefixes
+https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/X86/MCTargetDesc/X86MCCodeEmitter.cpp#L1555
+
+[Prefixes][REX][VEX][Opcode][ModR/M][SIB][Displacement][Immediate]
+
+opcode: 1-3 bytes
+
+prefix byte order:
+ - Lock/Rep → Segment → operand-size (0x66) → address-size (0x67) → opcode
+ - REX comes after legacy prefixes, just before opcode.
+
+0F: two-byte opcode escape prefix
+**** ModR/M
+[Mod][Reg/Opcode][R/M]
+
+- Mod (2 bits) → addressing mode / displacement size
+   00 → no displacement (except special cases)
+   01 → 8-bit displacement
+   10 → 32-bit displacement
+   11 → operand is a register
+
+- Reg/Opcode (3 bits) → register or opcode extension
+
+- R/M (3 bits) → register or memory operand
+
+000	EAX	RAX
+001	ECX	RCX
+010	EDX	RDX
+011	EBX	RBX
+100	ESP	RSP
+101	EBP	RBP
+110	ESI	RSI
+111	EDI	RDI
+
+Special rule:
+  If Mod = 00 and R/M = 101 → RIP-relative (in 64-bit mode) or disp32 (in 32-bit mode).
+**** REX (x86-64-v1)
+Emit this when using 64-bit operands or registers R8–R15.
+
+REX:  0 1 0 0 W R X B (0x4_)
+W changes the operand size to 64 bits
+R expands reg to 4 bits
+B expands r/m (or opreg in the few opcodes that encode the register in the 3 lowest opcode bits, such as "POP reg")
+X and B expand index and base in the SIB byte
+
+REX2: 0xD5
+      M0 R4 X4 B4 W R3 X3 B3
+**** SIB byte
+Encode SIB when memory operand uses [base + index*scale + disp]
+
+Only when ModR/M r/m = 100 (SIB)
+
+Scale: 00 → ×1, 01 → ×2, 10 → ×4, 11 → ×8
+Index: register
+Base: register or special (e.g., no base = 101)
+**** Displacement
+when memory addressing requires it (ModR/M indicates displacement)
+Size: 1, 4, or sometimes 8 bytes (64-bit RIP-relative)
+
+e.g.:
+[RAX + 0x10] → 8-bit displacement if fits, else 32-bit
+[RIP + offset] → 32-bit displacement in 64-bit mode
+**** Immediate
+1-8 bytes
+**** The VEX prefix (x86-64-v3)
+replaces the most commonly used instruction prefix bytes and escape bytes.
+https://en.wikipedia.org/wiki/VEX_prefix
+https://en.wikipedia.org/wiki/VEX_prefix#REX
+** TableGen
+https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/X86/MCTargetDesc/X86BaseInfo.h
+*** json
+https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/X86/MCTargetDesc/X86MCCodeEmitter.cpp
+**** FormBits
+is a bitmask representing properties of the instruction’s operand layout.
+
+https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/X86/X86InstrFormats.td
+https://github.com/llvm/llvm-project/blob/main/llvm/utils/TableGen/X86RecognizableInstr.h#L99
+
+enum {
+  Pseudo          = 0,
+  RawFrm          = 1,
+  AddRegFrm       = 2, // add register into the 3 low bits of the opcode
+  RawFrmMemOffs   = 3,
+  RawFrmSrc       = 4,
+  RawFrmDst       = 5,
+  RawFrmDstSrc    = 6,
+  RawFrmImm8      = 7,
+  RawFrmImm16     = 8,
+  MRMDestMem      = 32,
+  MRMSrcMem       = 33,
+  MRMSrcMem4VOp3  = 34,
+  MRMSrcMemOp4    = 35,
+  MRMXm           = 39,
+  MRM0m..MRM7m    = 40..47,
+  MRMDestReg      = 48,
+  MRMSrcReg       = 49,
+  MRMSrcReg4VOp3  = 50,
+  MRMSrcRegOp4    = 51,
+  MRMXr           = 55,
+  MRM0r..MRM7r    = 56..63,
+  // ... followed by MRM_C0..MRM_FF for hex opcode forms 64..126 etc.
+};
+
+1. Raw Forms (no ModR/M):
+   RawFrm, RawFrmMemOffs, RawFrmSrc, RawFrmDst, RawFrmDstSrc, RawFrmImm8, RawFrmImm16: used for immediate forms or memory offsets without ModR/M.
+
+2. AddReg Forms:
+   AddRegFrm: register encoded in low opcode bits (e.g., INC r, DEC r).
+
+3. ModR/M Forms:
+   MRMDestMem, MRMSrcMem, MRMDestReg, MRMSrcReg, plus their vector extensions (4VOp3, Op4).
+
+4. Fixed opcode forms (/digit or fixed Reg in ModR/M):
+
+   MRM0m–MRM7m, MRM0r–MRM7r: where /0.../7 are fixed sub-opcode encodings.
+   And MRMXm, MRMXr: extended mappings.
+   Plus MRM_C0..MRM_FF: hard-coded 2nd opcode or reg field mapping.
+**** TSFlags
+https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/X86/MCTargetDesc/X86BaseInfo.h#L692
+
+(set-flag :form-bits  (pop-bits 7)) ; 0-7
+(set-flag :op-size    (pop-bits 2)) ; 8-9
+(set-flag :ad-size    (pop-bits 2)) ; 10-11
+(set-flag :op-prefix  (pop-bits 2)) ; 12-13
+(set-flag :op-map     (pop-bits 4)) ; 14-17
+(set-flag :rex        (pop-bits 1)) ; 18
+(set-flag :imm        (pop-bits 4)) ; 19-22
+(set-flag :fp-type    (pop-bits 3)) ; 23-25
+(set-flag :lock       (pop-bits 1)) ; 26
+(set-flag :rep        (pop-bits 1)) ; 27
+(set-flag :sse-domain (pop-bits 2)) ; 28-29
+(set-flag :encoding   (pop-bits 2)) ; 30-31
+(let ((opcode (pop-bits 8)))        ; 32-39
+  ;; assert that the extracted json opcode is the same as the
+  ;; one encoded into the tsflags.
+  (assert (equal opcode (get-field :opcode))))
+
+;; :vector contains all the rest of the flags for easy checking for complex instructions
+(set-flag :vector     (json-bitfield-to-integer tsflags)) ; 40-
+
+(set-flag :vex-4v     (pop-bits 1))
+(set-flag :vex-l      (pop-bits 1))
+(set-flag :evex-k     (pop-bits 1))
+(set-flag :evex-z     (pop-bits 1))
+(set-flag :evex-l2    (pop-bits 1))
+(set-flag :evex-b     (pop-bits 1))
+(set-flag :cd8-scale  (pop-bits 3))
+(set-flag :evex-rc    (pop-bits 1))
+(set-flag :no-track   (pop-bits 1))
+(set-flag :explicit-op-prefix (pop-bits 2))
+(set-flag :evex-nf    (pop-bits 1))
+(set-flag :two-conditional (pop-bits 1))
+(set-flag :evex-u     (pop-bits 1))
+**** X86II::getOperandBias(Desc)
+returns an integer offset telling the emitter where the first “real” operand starts in the instruction’s operand list.
+
+https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/X86/X86InstrInfo.cpp
+**** corner cases
+***** constraints
+search for: constraints": "[^"]
+		"!name": "ADC32rr_REV",
+		"Constraints": "$src1 = $dst",
+*** fake instructions
+ADDR16_PREFIX
+LOCK_PREFIX
+REP_PREFIX
+REPE_PREFIX
+REPNE_PREFIX
+DATA16_PREFIX
+CS_PREFIX
+DS_PREFIX
+FS_PREFIX
+GS_PREFIX
+SS_PREFIX
+* etc
+** interested parties
+https://github.com/phantomics/specops/discussions/2
+** useful #command lines
+echo -n 'f3 90' | xxd -r -p | ndisasm -b 64 -
+cat test.asm && nasm test.asm && hexdump --canonical test
