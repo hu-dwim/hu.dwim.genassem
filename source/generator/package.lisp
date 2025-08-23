@@ -8,5 +8,6 @@
   (:use :common-lisp
         :alexandria
         :anaphora
+        :hu.dwim.genassem/asm-common
         :hu.dwim.genassem/x86)
   (:export))
