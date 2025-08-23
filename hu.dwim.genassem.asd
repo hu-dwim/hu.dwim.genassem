@@ -19,7 +19,7 @@
   :depends-on (:alexandria
                :anaphora
                :hu.dwim.genassem/asm-common
-               :json-streams
+               :com.inuoe.jzon
                :uiop)
   :components ((:module "source"
                 :components

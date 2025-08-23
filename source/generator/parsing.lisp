@@ -6,22 +6,18 @@
 
 (in-package :hu.dwim.genassem)
 
-(defun json-value (obj key &optional of-type)
-  (let ((result (cdr (assoc key obj :test 'equal))))
-    (when of-type
-      (assert (eq of-type (pop result))))
-    result))
+(defun json-value (obj key)
+  (gethash key obj))
 
 (defun json/true-value? (obj key)
-  (equal (json-value obj key) 1))
+  (eql (json-value obj key) 1))
 
 (defun json/bitfield-value (obj key)
   (let ((bits (json-value obj key)))
-    (assert (eq :array (pop bits)))
     (json-bitfield-to-integer bits)))
 
 (defun json/def-like-value (obj key)
-  (let ((entry (json-value obj key :object)))
+  (let ((entry (json-value obj key)))
     (json/def-like-as-keyword entry)))
 
 (defun json/def-like-as-keyword (entry)
@@ -38,18 +34,17 @@
     (when (plusp (length value))
       value)))
 
-(defun get-encoding (obj)
+(defun has-encoding? (obj)
   (let ((value (json-value obj "Opcode")))
-    (when (eq :array (pop value))
-      (assert (eql 8 (length value)))
-      value)))
+    (assert (eql 8 (length value)))
+    value))
 
 ;; https://llvm.org/docs/TableGen/BackEnds.html#json-reference
 ;; "A bits array is ordered from least-significant bit to most-significant."
-(defun json-bitfield-to-integer (bit-list)
+(defun json-bitfield-to-integer (bit-vector)
   (let ((result 0))
-    (loop :for i = 0 :then (incf i)
-          :for bit :in (reverse bit-list)
+    (loop :for i :from (1- (length bit-vector)) :downto 0
+          :for bit = (aref bit-vector i)
           :do (progn
                 (setf result (ash result 1))
                 (eswitch (bit)
@@ -58,7 +53,6 @@
     result))
 
 (defun normalize-instruction (obj)
-  (assert (eq :object (pop obj)))
   (assert (equal "" (json-value obj "TwoOperandAliasConstraint")))
   (let ((result ()))
     (macrolet ((set-field (name value)
@@ -74,21 +68,30 @@
 
       (set-field :name (json-value obj "!name"))
 
-      (let ((form-entry (json-value obj "Form" :object)))
-        (set-field :form (intern (json-value form-entry "def") :keyword)))
+      (let* ((form-entry (json-value obj "Form"))
+             (form-value (json-value form-entry "def")))
+        (set-field
+         :form
+         (cond
+           ((starts-with-subseq "RawFrm" form-value)
+            :raw)
+           ((equal form-value "AddRegFrm")
+            :add-reg)
+           ((starts-with-subseq "MRM" form-value)
+            :mrm)
+           (t
+            (error "Unexpected Form value ~S" form-value)))))
 
       ;;(set-field :form-bits (json/bitfield-value obj "FormBits"))
       (set-field :opcode (json/bitfield-value obj "Opcode"))
       (set-field :has-position-order (json/true-value? obj "HasPositionOrder"))
 
-      (let ((preds (json-value obj "Predicates" :array)))
+      (let ((preds (json-value obj "Predicates")))
         (loop :with kwpkg = (find-package :keyword)
-              :for pred :in preds
-              :do (progn
-                    (assert (eq :object (pop pred)))
-                    (let ((name (json-value pred "def")))
-                      (push (intern name kwpkg)
-                            (getf result :predicates))))))
+              :for pred :across preds
+              :do (let ((name (json-value pred "def")))
+                    (push (intern name kwpkg)
+                          (getf result :predicates)))))
 
       (let ((value (json/def-like-value obj "OpSize")))
         (assert (member value '(:|OpSize16| :|OpSize32| :|OpSizeFixed|)))
@@ -127,14 +130,14 @@
       ;; Uses/Defs = implicit operands (hidden side effects: registers, flags, memory, ports).
       (labels
           ((get-arg-list (json-key)
-             (let ((operands (json-value obj json-key :object)))
+             (let ((operands (json-value obj json-key)))
                (assert (equal "dag" (json-value operands "kind")))
-               (json-value operands "args" :array)))
+               (json-value operands "args")))
            (normalize-arg-list (args)
-             (loop :for (json-type type name) :in args
-                   :do (assert (eq :array  json-type))
-                   :do (assert (eq :object (pop type)))
-                   :unless (eq :null name)
+             (loop :for arg :across args
+                   :for type = (elt arg 0)
+                   :for name = (elt arg 1)
+                   :unless (eq 'null name)
                      :collect (cons name (json/def-like-as-keyword type)))))
         (let ((output-args (normalize-arg-list (get-arg-list "OutOperandList")))
               (input-args  (normalize-arg-list (get-arg-list "InOperandList"))))
@@ -174,8 +177,8 @@
   (and (not (ends-with-subseq "_PREFIX" (json-value obj "!name")))
        (asm-string obj)
        (not (pseudo-instruction?  obj))
-       (get-encoding obj)
-       (let* ((tsflags (json-value obj "TSFlags" :array))
+       (has-encoding? obj)
+       (let* ((tsflags (json-value obj "TSFlags"))
               (vector-flags (subseq tsflags 40)))
          ;; for now skip all the "fancy" instructions
          (every 'zerop vector-flags))))
@@ -185,54 +188,69 @@
   (declare (ignore obj))
   t)
 
-(defun process-x86-json (path instruction-emitter)
-  (declare (optimize (speed 3)) ; needed to force-enable tail call optimization
-           (type function instruction-emitter))
-  (with-input-from-file (file path)
-    (json-streams:with-open-json-stream
-        (stream (json-streams:make-json-input-stream file))
-      (let ((instruction-names ())
-            (emit-counter 0))
-        (declare (type fixnum emit-counter))
-        (block parsing
-          (labels
-              ((next-token ()
-                 (let ((token (json-streams:json-read stream)))
-                   ;; (print token) ; TODO
-                   (when (eq token :eof)
-                     (return-from parsing (values)))
-                   token))
-               (toplevel ()
-                 (ecase (next-token)
-                   (:begin-object (toplevel-key))))
-               (toplevel-key ()
-                 (let ((token (next-token)))
-                   (unless (eq token :end-object)
-                     (assert (stringp token))
-                     (let ((obj (json-streams::parse-single stream)))
-                       (cond
-                         ((string= token "!instanceof")
-                          (assert (eq :object (pop obj)))
-                          (assert (not instruction-names))
-                          (let ((entry (find "X86Inst" obj :test 'equal :key 'first)))
-                            (assert (eq :array (second entry)))
-                            (setf instruction-names (make-hash-table :test 'equal))
-                            (map nil (lambda (name)
-                                       (setf (gethash name instruction-names) t))
-                                 (nthcdr 3 entry))
-                            (format *error-output* "~&; Found ~S instruction descriptors~%"
-                                    (hash-table-size instruction-names))))
-                         ((and (gethash token instruction-names) ; this toplevel key is one of the listed instructions
-                               (json/include-instruction? (rest obj)))
-                          (let ((instr (normalize-instruction obj)))
-                            (when (include-instruction? instr)
-                              (assert (eq :object (pop obj)))
-                              (assert (equal "X86" (json-value obj "Namespace")))
-                              (incf emit-counter)
-                              ;; (format *error-output* "~&; calling emitter for ~S~%" (getf instr :mnemonic))
-                              (funcall instruction-emitter instr :raw-json obj))))))))
-                 (toplevel-key)))
-            (toplevel)))))))
+(defun process-x86-json (stream instruction-emitter)
+  (jzon:with-parser (parser stream)
+    (let ((depth 0)
+          top
+          stack
+          key-stack
+          instr-names)
+      (flet ((finish-value (value)
+               (typecase stack
+                 (null                 (setf top value))
+                 ((cons list)          (push value (car stack)))
+                 ((cons hash-table)    (let ((key (pop key-stack)))
+                                         (if (= depth 1)
+                                             (values) ; don't collect toplevel entries
+                                             (setf (gethash key (car stack)) value)))))))
+        (loop
+          (multiple-value-bind (event value)
+              (jzon:parse-next parser)
+            (ecase event
+              ((nil)
+               (assert (zerop (hash-table-count top)))
+               (return instr-names))
+
+              (:value
+               (finish-value value))
+
+              (:begin-array
+               (push (list) stack))
+
+              (:end-array
+               (finish-value (coerce (the list (nreverse (pop stack))) 'simple-vector)))
+
+              (:begin-object
+               ;; (when (< depth 2)
+               ;;   (format t ":begin-object depth ~A, key stack ~A~%" depth key-stack))
+               (incf depth)
+               (push (make-hash-table :test 'equal) stack))
+
+              (:end-object
+               (decf depth)
+               (let ((obj (pop stack))
+                     (key (first key-stack)))
+                 (when (eql depth 1)
+                   ;; (format t ":end-object depth ~A, key stack ~A, obj ~A~%" depth key-stack obj)
+                   (cond
+                     ((equal "!instanceof" key)
+                      (assert (not instr-names))
+                      (check-type obj hash-table)
+                      (let ((name-vector (gethash "X86Inst" obj)))
+                        (setf instr-names (make-hash-table :test 'equal))
+                        (loop :for name :across name-vector
+                              :do (setf (gethash name instr-names) t))))
+                     ((and (gethash key instr-names)
+                           (json/include-instruction? obj))
+                      (let ((instr (normalize-instruction obj)))
+                        (when (include-instruction? instr)
+                          (assert (equal "X86" (json-value obj "Namespace")))
+                          ;; (format *error-output* "~&; calling emitter for ~S~%" (getf instr :mnemonic))
+                          (funcall instruction-emitter instr))))))
+                 (finish-value obj)))
+
+              (:object-key
+               (push value key-stack)))))))))
 
 ;; (defun to-hex-byte-string (val)
 ;;   (assert (<= val #xff))
@@ -287,16 +305,17 @@
           ;;   (break))
           ;; (when (starts-with-subseq "OUT" name)
           ;;   (break))
-          (case form
-            (:|RawFrm|
+          (ecase form
+            (:raw
              ;; RawFrm specifically means raw form: the instruction has no special ModR/M or opcode map handling—it’s just a fixed sequence of bytes.
              (emit-asm-form
-              `(define-instruction ,lisp-name ,(mapcar 'car processed-params)
-                 ',(form/raw (nreverse prefix-bytes)
-                             (nreverse opcode-prefix-bytes)
-                             opcode)))
+              (form/raw lisp-name
+                        processed-params
+                        (nreverse prefix-bytes)
+                        (nreverse opcode-prefix-bytes)
+                        opcode))
              lisp-name)
-            (:|AddRegFrm|
+            (:add-reg
              (emit-asm-form
               `(define-instruction ,lisp-name ,(mapcar 'car processed-params)
                  ,(form/add-reg processed-params
@@ -304,45 +323,10 @@
                                 (nreverse opcode-prefix-bytes)
                                 opcode)))
              lisp-name)
-            (:|RawFrmDstSrc|)
-            (:|RawFrmImm8|)
-            (:|MRMDestMem|)
-            (:|MRM_E0|)
-            (:|MRM_E1|)
-            (:|MRM_C0|)
-            (:|MRM_CA|)
-            (:|MRM_CF|)
-            (:|MRM_FC|)
-            (:|MRM_D7|)
-            (:|MRM_D9|)
-            (:|MRM_DD|)
-            (:|MRM_F0|)
-            (:|MRM_F6|)
-            (:|MRM_FA|)
-            (:|MRM_FB|)
-            (:|MRM_FF|)
-            (:|MRMXr|)
-            (:|MRM1m|)
-            (:|MRM2m|)
-            (:|MRM3m|)
-            (:|MRM4m|)
-            (:|MRM5m|)
-            (:|MRM6m|)
-            (:|MRM7m|)
-            (:|MRM1r|)
-            (:|MRM2r|)
-            (:|MRM3r|)
-            (:|MRM4r|)
-            (:|MRM5r|)
-            (:|MRM6r|)
-            (:|MRM7r|)
-            (:|MRMSrcMem|)
-            (:|MRMSrcMem4VOp3|)
-            (:|MRMSrcReg|)
-            (:|MRMSrcReg4VOp3|)
-            (:|MRMDestReg|)
-            (:|MRM0m|)
-            (:|MRM0r|)))))))
+            (:mrm
+             ;; TODO
+             )))))))
+
 (defun setup-pprint-dispatch ()
   (set-pprint-dispatch
    '(cons (eql define-instruction))
@@ -399,22 +383,24 @@
               (instr-counter 0)
               (emit-counter 0)
               (symbols-to-export ()))
-          (process-x86-json "/home/alendvai/common-lisp/maru/source/assembler/x86.json"
-                            (lambda (obj &key raw-json)
-                              (incf instr-counter)
-                              (let* ((predicates (getf obj :predicates))
-                                     (include? (loop :for blacklisted :in predicate-blacklist
-                                                     :always (not (member blacklisted predicates :test 'eq)))))
-                                (if include?
-                                    (progn
-                                      (write-char #\. *error-output*)
-                                      (incf emit-counter)
-                                      (when print-source?
-                                        (print obj)
-                                        (print raw-json))
-                                      (push (generate-x86-instruction-emitter obj)
-                                            symbols-to-export))
-                                    (write-char #\x *error-output*)))))
+          (with-open-file (jstream (asdf:system-relative-pathname
+                               :hu.dwim.genassem
+                               "x86.json"))
+            (process-x86-json jstream
+                              (lambda (obj)
+                                (incf instr-counter)
+                                (let* ((predicates (getf obj :predicates))
+                                       (include? (loop :for blacklisted :in predicate-blacklist
+                                                       :always (not (member blacklisted predicates :test 'eq)))))
+                                  (if include?
+                                      (progn
+                                        (write-char #\. *error-output*)
+                                        (incf emit-counter)
+                                        (when print-source?
+                                          (print obj))
+                                        (push (generate-x86-instruction-emitter obj)
+                                              symbols-to-export))
+                                      (write-char #\x *error-output*))))))
           (emit-asm-form `(export '(,@ (remove nil symbols-to-export))))
           (format *error-output* "~&; emitted ~S of ~S instructions~%"
                   emit-counter instr-counter))))))
