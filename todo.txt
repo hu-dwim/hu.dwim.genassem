@@ -2,10 +2,24 @@
 
 * bugs
 * code cleanup
+** isAsmParserOnly, isCodeGenOnly
+what are these? skip them?
+
+we already skip isPseudo and where Opcode is zero
 * knowledge base
 ** x86
+https://www.felixcloutier.com/x86/nop
 *** microarchitecture levels: x86-64-v1 .. x86-64-v4
 https://en.wikipedia.org/wiki/X86-64#Microarchitecture_levels
+
++-----------------+---------------------------------------------------------+
+| Level name      | CPU features                                            |
++-----------------+---------------------------------------------------------+
+| (baseline)      | CMOV, CX8, FPU, FXSR, MMX, OSFXSR, SCE, SSE, SSE2       |
+| x86-64-v2 ~2008 | LAHF-SAHF, POPCNT, SSE3, SSE4.1, SSE4.2, SSSE3          |
+| x86-64-v3 ~2013 | AVX, AVX2, BMI1, BMI2, F16C, FMA, LZCNT, MOVBE, OSXSAVE |
+| x86-64-v4 ~2017 | AVX512F, AVX512BW, AVX512CD, AVX512DQ, AVX512VL         |
++-----------------+---------------------------------------------------------+
 *** encoding and prefixes
 https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/X86/MCTargetDesc/X86MCCodeEmitter.cpp#L1555
 
@@ -74,9 +88,80 @@ e.g.:
 replaces the most commonly used instruction prefix bytes and escape bytes.
 https://en.wikipedia.org/wiki/VEX_prefix
 https://en.wikipedia.org/wiki/VEX_prefix#REX
+*** floating point registers
++----------------+-----------------+--------+-------+------------------------------+
+| Register Class | Names           | Width  | Count | Encoding in Machine Code     |
++----------------+-----------------+--------+-------+------------------------------+
+| x87 FPU stack  | ST(0)–ST(7)     | 80-bit |   8   | 3-bit reg field in ModR/M.   |
+|                |                 |        |       | Often implicit ST(0).        |
+| MMX            | MM0–MM7         | 64-bit |   8   | 3-bit reg field in ModR/M.   |
+| SSE            | XMM0–XMM15      |128-bit |  16   | ModR/M + REX.R/B for ≥8.     |
+| AVX            | YMM0–YMM15      |256-bit |  16   | Same as XMM, requires VEX.   |
+| AVX-512        | ZMM0–ZMM31      |512-bit |  32   | EVEX extends to 5-bit regs.  |
+| AVX-512 Masks  | K0–K7           |  1–64b |   8   | EVEX.aaa + ModR/M field.     |
++----------------+-----------------+--------+-------+------------------------------+
+
+                    +--------------------+
+   Operand: reg N → |  Split into fields |
+                    +--------------------+
+                             |
+                +-----------------------------+
+                | Lower 3 bits (N[2:0])       |
+                | → ModR/M.reg                |
+                | → ModR/M.r/m                |
+                | → SIB.index                 |
+                +-----------------------------+
+                             |
+                +-----------------------------+
+                |  4th bit (N[3])             |
+                | → REX.R (for ModR/M.reg)    |
+                | → REX.B (for ModR/M.r/m)    |
+                | → REX.X (for SIB.index)     |
+                +-----------------------------+
+                             |
+                +-----------------------------+
+                |  4th bit (N[3]) in VEX/EVEX |
+                | → VEX.R / VEX.B / VEX.X     |
+                |   (inverted encoding!)      |
+                +-----------------------------+
+                             |
+                +-----------------------------+
+                | High bits (N[4:5])          |
+                | → EVEX.R’, EVEX.V’, EVEX.B’ |
+                +-----------------------------+
+
 ** TableGen
 https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/X86/MCTargetDesc/X86BaseInfo.h
+*** 32/64 versions; e.g. bswap32r vs bswap64r
+there are quite a few instructions in x86 where the encoding bytes are the same but the operand size / mode makes them distinct instructions in LLVM.
+
+LLVM always “splits” them because the backend (assembler/disassembler/codegen) needs typed instruction defs (GR32 vs GR64, etc). But from an assembler author’s perspective, you could unify them into one rule keyed on operand size + mode.
+
+complete (?) list of such instructions:
+ - BSWAP
+ - XCHG EAX/RAX
+ - MOV reg variants
+   - 8B /r (reg←r/m) and 89 /r (r/m←reg)
+   - imm to reg (B8 + rd)
+ - PUSH
+ - POP
+ - INC
+ - DEC
+ - MOV
+ - CBW/CWDE/CDQE (98)
+ - CWD/CDQ/CQO (99)
+
+~30 instructions have 32/64-bit duplicates with identical opcode fields.
+The biggest families: MOV, PUSH/POP, XCHG, INC/DEC, BSWAP, sign/zero extends.
+
+proposed fix:
+Instead of duplicating, you could:
+1. Parse the opcode bytes (0F C8+rd, etc).
+2. Look at operand size (r32 vs r64).
+3. Emit the same opcode, with size attached.
+This would let you keep a single assembler rule for bswap, push, etc.
 *** json
+https://llvm.org/docs/TableGen/BackEnds.html#json-reference
 https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/X86/MCTargetDesc/X86MCCodeEmitter.cpp
 **** FormBits
 is a bitmask representing properties of the instruction’s operand layout.
@@ -168,6 +253,15 @@ https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/X86/X86InstrInfo.
 search for: constraints": "[^"]
 		"!name": "ADC32rr_REV",
 		"Constraints": "$src1 = $dst",
+**** parsing json
+streaming API is a must because the file is 147MB (222 pretty printed)
+ which disqualifies most CL json parsers
+
+https://sabracrolleton.github.io/json-review#decoding
+https://github.com/sabracrolleton/sabracrolleton.github.io/
+
+probably i should have picked this one instead of json-streams:
+https://github.com/Zulu-Inuoe/jzon#streaming-parser-example
 *** fake instructions
 ADDR16_PREFIX
 LOCK_PREFIX
