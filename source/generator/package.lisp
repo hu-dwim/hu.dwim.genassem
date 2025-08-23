@@ -10,4 +10,6 @@
         :anaphora
         :hu.dwim.genassem/asm-common
         :hu.dwim.genassem/x86)
+  (:local-nicknames
+   (#:jzon :com.inuoe.jzon))
   (:export))

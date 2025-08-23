@@ -61,11 +61,18 @@
 (define-constant rex.x #x02)
 (define-constant rex.b #x01)
 
-(defun form/raw (prefix-bytes opcode-prefix-bytes opcode)
-  `(progn
-     (emit-bytes ',prefix-bytes)
-     (emit-bytes ',opcode-prefix-bytes)
-     (emit-byte ',opcode)))
+(defun maybe-emit-bytes (bytes)
+  (when bytes
+    `((emit-bytes ',bytes))))
+
+(defun form/raw (name params prefix-bytes opcode-prefix-bytes opcode)
+  (let ((body `(,@(maybe-emit-bytes prefix-bytes)
+                ,@(maybe-emit-bytes opcode-prefix-bytes)
+                (emit-byte ',opcode))))
+    `(define-instruction ,name ,(mapcar 'car params)
+       ',(if (= 1 (length body))
+             (first body)
+             `(progn ,@body)))))
 
 (defun form/add-reg (params prefix-bytes opcode-prefix-bytes opcode)
   `(multiple-value-bind (reg-index reg-mode reg-extra-bit)
