@@ -4,27 +4,31 @@
 ;;;
 ;;; See LICENCE for details.
 
-(uiop:define-package :hu.dwim.genassem/asm-base
+(uiop:define-package :hu.dwim.genassem/asm-common
   (:use :alexandria
         :anaphora
         :common-lisp
         )
   (:export
+   #:define-instruction
    #:emit-byte
+   #:emit-bytes
    #:with-asm
    #:buffer-of
-   #:register-name->encoding-bits
+
+   #:assembler-error
+   #:simple-assembler-error
+   #:invalid-instruction-error
    ))
 
 (uiop:define-package :hu.dwim.genassem/x86
   (:use :alexandria
         :anaphora
         :common-lisp
-        :hu.dwim.genassem/asm-base
+        :hu.dwim.genassem/asm-common
         )
   (:export
-   #:emit-byte
-   #:with-asm
-   #:buffer-of
    #:register-name->encoding-bits
+   #:form/raw
+   #:form/add-reg
    ))

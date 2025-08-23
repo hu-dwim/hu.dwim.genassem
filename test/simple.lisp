@@ -31,22 +31,13 @@
      :error-output :string)))
 
 (defun ndisasm-output (asm-context)
-  (disasm-output/stdin
-   '("/gnu/store/hmi4v827sq0r8c7qpz7an8405xm5zwwf-nasm-2.15.05/bin/ndisasm"
-     "-b" "64" "-p" "intel" "-")
-   asm-context))
+  (disasm-output/stdin '("ndisasm" "-b" "64" "-p" "intel" "-") asm-context))
 
 (defun xed-output (asm-context)
-  (disasm-output/tmp-file
-   '("/gnu/store/vdhg7r1s24cbwgh4jv46937bfs0zjcgl-intel-xed-2025.03.02/bin/xed"
-     "-64" "-ir")
-   asm-context))
+  (disasm-output/tmp-file '("xed" "-64" "-ir") asm-context))
 
 (defun zydis-output (asm-context)
-  (disasm-output/tmp-file
-   '("/gnu/store/d0a5xrkss23rg8jqzf5pwcvr04pml6z0-zydis-4.1.0/bin/ZydisDisasm"
-       "-64")
-   asm-context))
+  (disasm-output/tmp-file '("ZydisDisasm""-64") asm-context))
 
 (defparameter *simple-tests*
 '(((_ret64)
@@ -63,6 +54,10 @@
 00000009  90                nop
 ")))
 
+(defparameter *invalid-instructions*
+  '((_bswap32r r14)
+    (_bswap64r eax)))
+
 (deftest simple ()
   (loop :for entry :in *simple-tests*
         :for instrs = (butlast entry)
@@ -72,3 +67,9 @@
         ;; :do (print (xed-output context))
         ;; :do (print (zydis-output context))
         ))
+
+(deftest invalids ()
+  (map nil (lambda (instr)
+             (signals invalid-instruction-error
+               (macroexpand instr)))
+       *invalid-instructions*))

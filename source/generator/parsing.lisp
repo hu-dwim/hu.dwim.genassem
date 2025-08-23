@@ -21,15 +21,18 @@
     (json-bitfield-to-integer bits)))
 
 (defun json/def-like-value (obj key)
-  (let* ((entry (json-value obj key :object))
-         (value (json-value entry "def")))
+  (let ((entry (json-value obj key :object)))
+    (json/def-like-as-keyword entry)))
+
+(defun json/def-like-as-keyword (entry)
+  (let ((value (json-value entry "def")))
     (intern value :keyword)))
 
 (defun pseudo-instruction? (obj)
   (or (json/true-value? obj "isPseudo")
       (json/true-value? obj "isCodeGenOnly")))
 
-(defun asm-mnemonic (obj)
+(defun asm-string (obj)
   (let ((value (json-value obj "AsmString")))
     (check-type value string)
     (when (plusp (length value))
@@ -56,18 +59,27 @@
 
 (defun normalize-instruction (obj)
   (assert (eq :object (pop obj)))
+  (assert (equal "" (json-value obj "TwoOperandAliasConstraint")))
   (let ((result ()))
     (macrolet ((set-field (name value)
                  `(setf (getf result ,name) ,value))
                (get-field (name)
                  `(getf result ,name)))
-      (set-field :mnemonic (asm-mnemonic obj))
+      (let ((asm-string (asm-string obj)))
+        (when asm-string
+          (set-field :asm-string asm-string)
+          (set-field :mnemonic (aif (position #\Tab asm-string)
+                                    (subseq asm-string 0 it)
+                                    asm-string))))
+
       (set-field :name (json-value obj "!name"))
 
       (let ((form-entry (json-value obj "Form" :object)))
         (set-field :form (intern (json-value form-entry "def") :keyword)))
 
+      ;;(set-field :form-bits (json/bitfield-value obj "FormBits"))
       (set-field :opcode (json/bitfield-value obj "Opcode"))
+      (set-field :has-position-order (json/true-value? obj "HasPositionOrder"))
 
       (let ((preds (json-value obj "Predicates" :array)))
         (loop :with kwpkg = (find-package :keyword)
@@ -83,9 +95,14 @@
         (set-field :op-size value))
 
       (let ((value (json/def-like-value obj "OpMap")))
-        (assert (member value '(:|OB| :|TA| :|TB| :|T8|
+        (assert (member value '(:|OB| ; One Byte
+                                :|TA|
+                                :|TB|
+                                :|T8|
                                 :|T_MAP4| :|T_MAP5| :|T_MAP6| :|T_MAP7|
-                                :|XOPA| :|XOP8| :|XOP9| :|ThreeDNow|)))
+                                :|XOPA|
+                                :|XOP8| :|XOP9|
+                                :|ThreeDNow|)))
         (set-field :op-map value))
 
       (let ((value (json/def-like-value obj "OpPrefix")))
@@ -102,29 +119,60 @@
           ;; SD: 0xF2
           (set-field :op-prefix/explicit value)))
 
-      ;;;
-      ;;; args
-      ;;;
+;;;
+;;; args
+;;;
 
       ;; InOperandList/OutOperandList = visible, explicit operands.
       ;; Uses/Defs = implicit operands (hidden side effects: registers, flags, memory, ports).
-      (let* ((inputs     (json-value obj "InOperandList" :object))
-             (json-args  (json-value inputs "args" :array)))
-        (assert (equal "dag" (json-value inputs "kind")))
-        (let ((args (loop :for (json-type type name) :in json-args
-                          :do (assert (eq :array json-type))
-                          :unless (eq :null name)
-                            :collect (cons name type))))
-          (set-field :args args)))
+      (labels
+          ((get-arg-list (json-key)
+             (let ((operands (json-value obj json-key :object)))
+               (assert (equal "dag" (json-value operands "kind")))
+               (json-value operands "args" :array)))
+           (normalize-arg-list (args)
+             (loop :for (json-type type name) :in args
+                   :do (assert (eq :array  json-type))
+                   :do (assert (eq :object (pop type)))
+                   :unless (eq :null name)
+                     :collect (cons name (json/def-like-as-keyword type)))))
+        (let ((output-args (normalize-arg-list (get-arg-list "OutOperandList")))
+              (input-args  (normalize-arg-list (get-arg-list "InOperandList"))))
+          (when (string= (json-value obj "Constraints")
+                         "$src = $dst")
+            (assert (string= "src" (car (first input-args))))
+            (assert (string= "dst" (car (first output-args))))
+            (pop output-args))
+          (set-field :parameters (append output-args input-args))))
+
+      ;; TODO delme
+      (let ((key (json-value obj "FormBits")
+                 ;;(get-field :form)
+                 #+nil(list
+                       ;;(get-field :mnemonic)
+                       (get-field :opcode)
+                       (get-field :op-map)
+                       (get-field :form)
+                       )))
+        (push result (gethash key *map*)))
 
       result)))
+
+;; TODO delme
+(defparameter *map* (make-hash-table :test 'equal))
+
+;; (maphash (lambda (key value)
+;;            (format t "~%*** ~A~%      ~A~%"
+;;                    key (mapcar (lambda (instr) (getf instr :asm-string)) value)))
+;;          *map*)
+
 
 ;; (defparameter *supported-encodings* '("EncNormal"))
 
 ;; called on the raw json
 (defun json/include-instruction? (obj)
   (and (not (ends-with-subseq "_PREFIX" (json-value obj "!name")))
-       (asm-mnemonic obj)
+       (asm-string obj)
        (not (pseudo-instruction?  obj))
        (get-encoding obj)
        (let* ((tsflags (json-value obj "TSFlags" :array))
@@ -186,11 +234,6 @@
                  (toplevel-key)))
             (toplevel)))))))
 
-(defun emit-form (form)
-  (pprint form)
-  ;;(terpri)
-  (force-output))
-
 ;; (defun to-hex-byte-string (val)
 ;;   (assert (<= val #xff))
 ;;   (format nil "~x" val))
@@ -198,46 +241,46 @@
 (defun intern/asm (str)
   (intern (string-upcase str)))
 
-(define-constant rex.w #x08)
-(define-constant rex.r #x04)
-(define-constant rex.x #x02)
-(define-constant rex.b #x01)
+(defun emit-asm-form (form)
+  (pprint form)
+  ;;(terpri)
+  (force-output))
 
 (defun generate-x86-instruction-emitter (instr)
-  (destructuring-bind (&key name args mnemonic opcode op-map
-                         op-prefix ;op-prefix/explicit
-                         form
+  (destructuring-bind (&key name parameters ;mnemonic
+                         opcode op-map
+                         op-prefix      ;op-prefix/explicit
+                         form has-position-order
                        &allow-other-keys)
       instr
     ;;(format *error-output* "~&; emitting ~S / ~S~%" name mnemonic)
     (assert (<= opcode 255))
+    (assert has-position-order)
     (labels
         (
          ;; (skip-instruction ()
          ;;   (format *error-output* "; skipping ~S~%" name)
          ;;   (return-from generate-x86-instruction-emitter))
          )
-      (let ((prefix-bytes (make-array 8 :element-type '(unsigned-byte 8) :adjustable t :fill-pointer 0))
-            (lisp-name (intern/asm (concatenate 'string "_" name)))
-            (arg-names (remove nil
-                               (mapcar (lambda (arg)
-                                         (destructuring-bind (name . type)
-                                             arg
-                                           (declare (ignore type))
-                                           (assert (stringp name))
-                                           (intern/asm name)))
-                                       args)))
-            (opcode-prefix-forms nil))
+      (let ((lisp-name (intern/asm (concatenate 'string "_" name)))
+            (processed-params (mapcar (lambda (arg)
+                                        (destructuring-bind (name . type)
+                                            arg
+                                          (assert (stringp name))
+                                          (cons (intern/asm name)
+                                                type)))
+                                      parameters))
+            (prefix-bytes ())
+            (opcode-prefix-bytes ()))
         (ecase op-prefix
           ((nil)     ())
-          (:pd       (vector-push-extend #x66 prefix-bytes))
-          ((:sd :xd) (vector-push-extend #xf2 prefix-bytes))
-          ((:ps :xs) (vector-push-extend #xf3 prefix-bytes)))
+          (:pd       (push #x66 prefix-bytes))
+          ((:sd :xd) (push #xf2 prefix-bytes))
+          ((:ps :xs) (push #xf3 prefix-bytes)))
         (case op-map
-          (:tb (push `(emit-byte #x0f) opcode-prefix-forms)))
+          (:tb (push #x0f opcode-prefix-bytes)))
 
-        (let ((prefix-forms (loop :for byte :across prefix-bytes
-                                  :collect `(emit-byte ,byte))))
+        (let ()
           ;; (when (equal mnemonic "adc{w}	{$src, %ax|ax, $src}")
           ;;   (break))
           ;; (when (equal name "RET64")
@@ -247,25 +290,19 @@
           (case form
             (:|RawFrm|
              ;; RawFrm specifically means raw form: the instruction has no special ModR/M or opcode map handling—it’s just a fixed sequence of bytes.
-             (emit-form
-              `(defmacro ,lisp-name ,arg-names
-                 `(progn
-                    ,@',prefix-forms
-                    ,@',opcode-prefix-forms
-                    (emit-byte ,',opcode))))
+             (emit-asm-form
+              `(define-instruction ,lisp-name ,(mapcar 'car processed-params)
+                 ',(form/raw (nreverse prefix-bytes)
+                             (nreverse opcode-prefix-bytes)
+                             opcode)))
              lisp-name)
             (:|AddRegFrm|
-             (emit-form
-              `(defmacro ,lisp-name ,arg-names
-                 (multiple-value-bind (reg-index reg-mode reg-extra-bit)
-                     (register-name->encoding-bits ,(first arg-names))
-                   `(progn
-                      ,@',prefix-forms
-                      (when (eql ,reg-mode 64)
-                        ;; emit REX.W + the reg extra bit
-                        (emit-byte (logior #x48 ,(if reg-extra-bit rex.b 0))))
-                      ,@',opcode-prefix-forms
-                      (emit-byte (logior ,',opcode ,reg-index))))))
+             (emit-asm-form
+              `(define-instruction ,lisp-name ,(mapcar 'car processed-params)
+                 ,(form/add-reg processed-params
+                                (nreverse prefix-bytes)
+                                (nreverse opcode-prefix-bytes)
+                                opcode)))
              lisp-name)
             (:|RawFrmDstSrc|)
             (:|RawFrmImm8|)
@@ -370,6 +407,6 @@
                                       (push (generate-x86-instruction-emitter obj)
                                             symbols-to-export))
                                     (write-char #\x *error-output*)))))
-          (emit-form `(export '(,@ (remove nil symbols-to-export))))
+          (emit-asm-form `(export '(,@ (remove nil symbols-to-export))))
           (format *error-output* "~&; emitted ~S of ~S instructions~%"
                   emit-counter instr-counter))))))
