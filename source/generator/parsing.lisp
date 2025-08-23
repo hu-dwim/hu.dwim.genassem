@@ -343,6 +343,10 @@
             (:|MRMDestReg|)
             (:|MRM0m|)
             (:|MRM0r|)))))))
+(defun setup-pprint-dispatch ()
+  (set-pprint-dispatch
+   '(cons (eql define-instruction))
+   (pprint-dispatch '(defun x (y)))))
 
 (defun generate-assembler/x86_64 (&key
                                     (print-source? nil)
@@ -358,9 +362,13 @@
       (let ((*standard-output* out-stream)
             (*print-readably* nil)
             (*print-case* :downcase)
-            (*package* package))
-        (write-string ";;; This file is generated, editing it is unwise.")
+            (*print-right-margin* 1160)
+            (*package* package)
+            (*print-pprint-dispatch* (copy-pprint-dispatch)))
+        (setup-pprint-dispatch)
+        (write-string ";;; This file is generated; editing it is unwise.")
         (pprint `(in-package ,(intern (package-name package) :keyword)))
+        (terpri)
         (let ((predicate-blacklist
                 '(:|Mode16|
                   :|Not64BitMode|
