@@ -54,10 +54,6 @@
 00000009  90                nop
 ")))
 
-(defparameter *invalid-instructions*
-  '((_bswap32r r14)
-    (_bswap64r eax)))
-
 (deftest simple ()
   (loop :for entry :in *simple-tests*
         :for instrs = (butlast entry)
@@ -67,6 +63,10 @@
         ;; :do (print (xed-output context))
         ;; :do (print (zydis-output context))
         ))
+
+(defparameter *invalid-instructions*
+  '((_bswap32r r14)
+    (_bswap64r eax)))
 
 (deftest invalids ()
   (map nil (lambda (instr)
