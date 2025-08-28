@@ -25,7 +25,8 @@
                 :components
                 ((:module "generator"
                   :components ((:file "package")
-                               (:file "parsing")))))))
+                               (:file "parsing" :depends-on ("package"))
+                               (:file "x86-generator" :depends-on ("parsing"))))))))
 
 (defsystem :hu.dwim.genassem/asm-common
   :description ""
