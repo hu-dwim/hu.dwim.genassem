@@ -14,6 +14,8 @@
    #:emit-byte
    #:emit-bytes
    #:with-asm
+   #:current-execution-mode
+   #:bits
    #:buffer-of
 
    #:assembler-error

@@ -85,6 +85,8 @@
       ;;(set-field :form-bits (json/bitfield-value obj "FormBits"))
       (set-field :opcode (json/bitfield-value obj "Opcode"))
       (set-field :has-position-order (json/true-value? obj "HasPositionOrder"))
+      (set-field :has-rex.w (json/true-value? obj "hasREX_W"))
+      (set-field :immt (json/def-like-value obj "ImmT"))
 
       (let ((preds (json-value obj "Predicates")))
         (loop :with kwpkg = (find-package :keyword)
@@ -263,4 +265,3 @@
   (pprint form)
   ;;(terpri)
   (force-output))
-
