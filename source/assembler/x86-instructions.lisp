@@ -1,349 +1,350 @@
-;;; This file is generated, editing it is unwise.
+;;; This file is generated; editing it is unwise.
 (in-package :hu.dwim.genassem/x86)
-(defmacro _adc16i16 (src) `(progn ,@'nil ,@'nil (emit-byte ,'21)))
-(defmacro _adc32i32 (src) `(progn ,@'nil ,@'nil (emit-byte ,'21)))
-(defmacro _adc64i32 (src) `(progn ,@'nil ,@'nil (emit-byte ,'21)))
-(defmacro _adc8i8 (src) `(progn ,@'nil ,@'nil (emit-byte ,'20)))
-(defmacro _add16i16 (src) `(progn ,@'nil ,@'nil (emit-byte ,'5)))
-(defmacro _add32i32 (src) `(progn ,@'nil ,@'nil (emit-byte ,'5)))
-(defmacro _add64i32 (src) `(progn ,@'nil ,@'nil (emit-byte ,'5)))
-(defmacro _add8i8 (src) `(progn ,@'nil ,@'nil (emit-byte ,'4)))
-(defmacro _and16i16 (src) `(progn ,@'nil ,@'nil (emit-byte ,'37)))
-(defmacro _and32i32 (src) `(progn ,@'nil ,@'nil (emit-byte ,'37)))
-(defmacro _and64i32 (src) `(progn ,@'nil ,@'nil (emit-byte ,'37)))
-(defmacro _and8i8 (src) `(progn ,@'nil ,@'nil (emit-byte ,'36)))
-(defmacro _bswap32r (src)
-  (multiple-value-bind
-      (hu.dwim.genassem::reg-index hu.dwim.genassem::reg-mode
-       hu.dwim.genassem::reg-extra-bit)
+
+(define-instruction _adc16i16 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(21)) ,@(list (emit-forms/imm src 16))))
+(define-instruction _adc32i32 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(21)) ,@(list (emit-forms/imm src 32))))
+(define-instruction _adc64i32 (src) `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(21)) ,@(list (emit-forms/imm src 32))))
+(define-instruction _adc8i8 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(20)) ,@(list (emit-forms/imm src 8))))
+(define-instruction _add16i16 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(5)) ,@(list (emit-forms/imm src 16))))
+(define-instruction _add32i32 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(5)) ,@(list (emit-forms/imm src 32))))
+(define-instruction _add64i32 (src) `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(5)) ,@(list (emit-forms/imm src 32))))
+(define-instruction _add8i8 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(4)) ,@(list (emit-forms/imm src 8))))
+(define-instruction _and16i16 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(37)) ,@(list (emit-forms/imm src 16))))
+(define-instruction _and32i32 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(37)) ,@(list (emit-forms/imm src 32))))
+(define-instruction _and64i32 (src) `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(37)) ,@(list (emit-forms/imm src 32))))
+(define-instruction _and8i8 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(36)) ,@(list (emit-forms/imm src 8))))
+(define-instruction _bswap32r (src)
+  (multiple-value-bind (reg-index reg-mode reg-extra-bit)
       (register-name->encoding-bits src :expected-mode 32)
     `(progn
-      ,@'nil
-      (when (eql ,hu.dwim.genassem::reg-mode 64)
-        (emit-byte
-         (logior 72
-                 ,(if hu.dwim.genassem::reg-extra-bit
-                      hu.dwim.genassem::rex.b
-                      0))))
-      ,@'((emit-byte 15))
-      (emit-byte (logior ,'200 ,hu.dwim.genassem::reg-index)))))
-(defmacro _bswap64r (src)
-  (multiple-value-bind
-      (hu.dwim.genassem::reg-index hu.dwim.genassem::reg-mode
-       hu.dwim.genassem::reg-extra-bit)
+      (emit-bytes ','nil)
+      ,(when (eql reg-mode 64)
+         `(emit-byte
+           ,(logior 64 rex.w
+                    (if reg-extra-bit
+                        1
+                        0))))
+      (emit-bytes ','(15))
+      (emit-byte ,(logior '200 reg-index)))))
+(define-instruction _bswap64r (src)
+  (multiple-value-bind (reg-index reg-mode reg-extra-bit)
       (register-name->encoding-bits src :expected-mode 64)
     `(progn
-      ,@'nil
-      (when (eql ,hu.dwim.genassem::reg-mode 64)
-        (emit-byte
-         (logior 72
-                 ,(if hu.dwim.genassem::reg-extra-bit
-                      hu.dwim.genassem::rex.b
-                      0))))
-      ,@'((emit-byte 15))
-      (emit-byte (logior ,'200 ,hu.dwim.genassem::reg-index)))))
-(defmacro _call64pcrel32 (dst) `(progn ,@'nil ,@'nil (emit-byte ,'232)))
-(defmacro _cbw () `(progn ,@'nil ,@'nil (emit-byte ,'152)))
-(defmacro _cdq () `(progn ,@'nil ,@'nil (emit-byte ,'153)))
-(defmacro _cdqe () `(progn ,@'nil ,@'nil (emit-byte ,'152)))
-(defmacro _clc () `(progn ,@'nil ,@'nil (emit-byte ,'248)))
-(defmacro _cld () `(progn ,@'nil ,@'nil (emit-byte ,'252)))
-(defmacro _cli () `(progn ,@'nil ,@'nil (emit-byte ,'250)))
-(defmacro _clts () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'6)))
-(defmacro _cmc () `(progn ,@'nil ,@'nil (emit-byte ,'245)))
-(defmacro _cmp16i16 (src) `(progn ,@'nil ,@'nil (emit-byte ,'61)))
-(defmacro _cmp32i32 (src) `(progn ,@'nil ,@'nil (emit-byte ,'61)))
-(defmacro _cmp64i32 (src) `(progn ,@'nil ,@'nil (emit-byte ,'61)))
-(defmacro _cmp8i8 (src) `(progn ,@'nil ,@'nil (emit-byte ,'60)))
-(defmacro _cpuid () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'162)))
-(defmacro _cqo () `(progn ,@'nil ,@'nil (emit-byte ,'153)))
-(defmacro _cwd () `(progn ,@'nil ,@'nil (emit-byte ,'153)))
-(defmacro _cwde () `(progn ,@'nil ,@'nil (emit-byte ,'152)))
-(defmacro _femms () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'14)))
-(defmacro _getsec () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'55)))
-(defmacro _hlt () `(progn ,@'nil ,@'nil (emit-byte ,'244)))
-(defmacro _in16ri (port) `(progn ,@'nil ,@'nil (emit-byte ,'229)))
-(defmacro _in16rr () `(progn ,@'nil ,@'nil (emit-byte ,'237)))
-(defmacro _in32ri (port) `(progn ,@'nil ,@'nil (emit-byte ,'229)))
-(defmacro _in32rr () `(progn ,@'nil ,@'nil (emit-byte ,'237)))
-(defmacro _in8ri (port) `(progn ,@'nil ,@'nil (emit-byte ,'228)))
-(defmacro _in8rr () `(progn ,@'nil ,@'nil (emit-byte ,'236)))
-(defmacro _int (trap) `(progn ,@'nil ,@'nil (emit-byte ,'205)))
-(defmacro _int3 () `(progn ,@'nil ,@'nil (emit-byte ,'204)))
-(defmacro _invd () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'8)))
-(defmacro _iret16 () `(progn ,@'nil ,@'nil (emit-byte ,'207)))
-(defmacro _iret32 () `(progn ,@'nil ,@'nil (emit-byte ,'207)))
-(defmacro _iret64 () `(progn ,@'nil ,@'nil (emit-byte ,'207)))
-(defmacro _jecxz (dst) `(progn ,@'nil ,@'nil (emit-byte ,'227)))
-(defmacro _jmp_1 (dst) `(progn ,@'nil ,@'nil (emit-byte ,'235)))
-(defmacro _jrcxz (dst) `(progn ,@'nil ,@'nil (emit-byte ,'227)))
-(defmacro _lahf () `(progn ,@'nil ,@'nil (emit-byte ,'159)))
-(defmacro _leave64 () `(progn ,@'nil ,@'nil (emit-byte ,'201)))
-(defmacro _loop (dst) `(progn ,@'nil ,@'nil (emit-byte ,'226)))
-(defmacro _loope (dst) `(progn ,@'nil ,@'nil (emit-byte ,'225)))
-(defmacro _loopne (dst) `(progn ,@'nil ,@'nil (emit-byte ,'224)))
-(defmacro _lret16 () `(progn ,@'nil ,@'nil (emit-byte ,'203)))
-(defmacro _lret32 () `(progn ,@'nil ,@'nil (emit-byte ,'203)))
-(defmacro _lret64 () `(progn ,@'nil ,@'nil (emit-byte ,'203)))
-(defmacro _lreti16 (amt) `(progn ,@'nil ,@'nil (emit-byte ,'202)))
-(defmacro _lreti32 (amt) `(progn ,@'nil ,@'nil (emit-byte ,'202)))
-(defmacro _lreti64 (amt) `(progn ,@'nil ,@'nil (emit-byte ,'202)))
-(defmacro _mmx_emms () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'119)))
-(defmacro _mov16ri (dst src)
-  (multiple-value-bind
-      (hu.dwim.genassem::reg-index hu.dwim.genassem::reg-mode
-       hu.dwim.genassem::reg-extra-bit)
+      (emit-bytes ','nil)
+      ,(when (eql reg-mode 64)
+         `(emit-byte
+           ,(logior 64 rex.w
+                    (if reg-extra-bit
+                        1
+                        0))))
+      (emit-bytes ','(15))
+      (emit-byte ,(logior '200 reg-index)))))
+(define-instruction _call64pcrel32 (dst) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(232)) ,@(list)))
+(define-instruction _cbw () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(152)) ,@(list)))
+(define-instruction _cdq () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(153)) ,@(list)))
+(define-instruction _cdqe () `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(152)) ,@(list)))
+(define-instruction _clc () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(248)) ,@(list)))
+(define-instruction _cld () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(252)) ,@(list)))
+(define-instruction _cli () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(250)) ,@(list)))
+(define-instruction _clts () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(15 6)) ,@(list)))
+(define-instruction _cmc () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(245)) ,@(list)))
+(define-instruction _cmp16i16 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(61)) ,@(list (emit-forms/imm src 16))))
+(define-instruction _cmp32i32 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(61)) ,@(list (emit-forms/imm src 32))))
+(define-instruction _cmp64i32 (src) `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(61)) ,@(list (emit-forms/imm src 32))))
+(define-instruction _cmp8i8 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(60)) ,@(list (emit-forms/imm src 8))))
+(define-instruction _cmpsb () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(166)) ,@(list)))
+(define-instruction _cmpsl () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(167)) ,@(list)))
+(define-instruction _cmpsq () `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(167)) ,@(list)))
+(define-instruction _cmpsw () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(167)) ,@(list)))
+(define-instruction _cpuid () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(15 162)) ,@(list)))
+(define-instruction _cqo () `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(153)) ,@(list)))
+(define-instruction _cwd () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(153)) ,@(list)))
+(define-instruction _cwde () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(152)) ,@(list)))
+(define-instruction _enter (len lvl) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(200)) ,@(list (emit-forms/imm len 16) (emit-forms/imm lvl 8))))
+(define-instruction _femms () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(15 14)) ,@(list)))
+(define-instruction _getsec () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(15 55)) ,@(list)))
+(define-instruction _hlt () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(244)) ,@(list)))
+(define-instruction _in16ri (port) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(229)) ,@(list)))
+(define-instruction _in16rr () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(237)) ,@(list)))
+(define-instruction _in32ri (port) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(229)) ,@(list)))
+(define-instruction _in32rr () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(237)) ,@(list)))
+(define-instruction _in8ri (port) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(228)) ,@(list)))
+(define-instruction _in8rr () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(236)) ,@(list)))
+(define-instruction _insb () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(108)) ,@(list)))
+(define-instruction _insl () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(109)) ,@(list)))
+(define-instruction _insw () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(109)) ,@(list)))
+(define-instruction _int (trap) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(205)) ,@(list)))
+(define-instruction _int3 () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(204)) ,@(list)))
+(define-instruction _invd () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(15 8)) ,@(list)))
+(define-instruction _iret16 () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(207)) ,@(list)))
+(define-instruction _iret32 () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(207)) ,@(list)))
+(define-instruction _iret64 () `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(207)) ,@(list)))
+(define-instruction _jecxz (dst) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(227)) ,@(list)))
+(define-instruction _jmp_1 (dst) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(235)) ,@(list)))
+(define-instruction _jrcxz (dst) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(227)) ,@(list)))
+(define-instruction _lahf () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(159)) ,@(list)))
+(define-instruction _leave64 () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(201)) ,@(list)))
+(define-instruction _lodsb () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(172)) ,@(list)))
+(define-instruction _lodsl () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(173)) ,@(list)))
+(define-instruction _lodsq () `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(173)) ,@(list)))
+(define-instruction _lodsw () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(173)) ,@(list)))
+(define-instruction _loop (dst) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(226)) ,@(list)))
+(define-instruction _loope (dst) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(225)) ,@(list)))
+(define-instruction _loopne (dst) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(224)) ,@(list)))
+(define-instruction _lret16 () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(203)) ,@(list)))
+(define-instruction _lret32 () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(203)) ,@(list)))
+(define-instruction _lret64 () `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(203)) ,@(list)))
+(define-instruction _lreti16 (amt) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(202)) ,@(list (emit-forms/imm amt 16))))
+(define-instruction _lreti32 (amt) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(202)) ,@(list (emit-forms/imm amt 16))))
+(define-instruction _lreti64 (amt) `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(202)) ,@(list (emit-forms/imm amt 16))))
+(define-instruction _mmx_emms () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(15 119)) ,@(list)))
+(define-instruction _mov16ao16 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(161)) ,@(list)))
+(define-instruction _mov16ao32 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(161)) ,@(list)))
+(define-instruction _mov16ao64 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(161)) ,@(list)))
+(define-instruction _mov16o16a (dst) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(163)) ,@(list)))
+(define-instruction _mov16o32a (dst) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(163)) ,@(list)))
+(define-instruction _mov16o64a (dst) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(163)) ,@(list)))
+(define-instruction _mov16ri (dst src)
+  (multiple-value-bind (reg-index reg-mode reg-extra-bit)
       (register-name->encoding-bits dst :expected-mode 16)
     `(progn
-      ,@'nil
-      (when (eql ,hu.dwim.genassem::reg-mode 64)
-        (emit-byte
-         (logior 72
-                 ,(if hu.dwim.genassem::reg-extra-bit
-                      hu.dwim.genassem::rex.b
-                      0))))
-      ,@'nil
-      (emit-byte (logior ,'184 ,hu.dwim.genassem::reg-index)))))
-(defmacro _mov32ri (dst src)
-  (multiple-value-bind
-      (hu.dwim.genassem::reg-index hu.dwim.genassem::reg-mode
-       hu.dwim.genassem::reg-extra-bit)
+      (emit-bytes ','nil)
+      ,(when (eql reg-mode 64)
+         `(emit-byte
+           ,(logior 64 rex.w
+                    (if reg-extra-bit
+                        1
+                        0))))
+      (emit-bytes ','nil)
+      (emit-byte ,(logior '184 reg-index)))))
+(define-instruction _mov32ao16 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(161)) ,@(list)))
+(define-instruction _mov32ao32 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(161)) ,@(list)))
+(define-instruction _mov32ao64 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(161)) ,@(list)))
+(define-instruction _mov32o16a (dst) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(163)) ,@(list)))
+(define-instruction _mov32o32a (dst) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(163)) ,@(list)))
+(define-instruction _mov32o64a (dst) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(163)) ,@(list)))
+(define-instruction _mov32ri (dst src)
+  (multiple-value-bind (reg-index reg-mode reg-extra-bit)
       (register-name->encoding-bits dst :expected-mode 32)
     `(progn
-      ,@'nil
-      (when (eql ,hu.dwim.genassem::reg-mode 64)
-        (emit-byte
-         (logior 72
-                 ,(if hu.dwim.genassem::reg-extra-bit
-                      hu.dwim.genassem::rex.b
-                      0))))
-      ,@'nil
-      (emit-byte (logior ,'184 ,hu.dwim.genassem::reg-index)))))
-(defmacro _mov64ri (dst src)
-  (multiple-value-bind
-      (hu.dwim.genassem::reg-index hu.dwim.genassem::reg-mode
-       hu.dwim.genassem::reg-extra-bit)
+      (emit-bytes ','nil)
+      ,(when (eql reg-mode 64)
+         `(emit-byte
+           ,(logior 64 rex.w
+                    (if reg-extra-bit
+                        1
+                        0))))
+      (emit-bytes ','nil)
+      (emit-byte ,(logior '184 reg-index)))))
+(define-instruction _mov64ao32 (src) `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(161)) ,@(list)))
+(define-instruction _mov64ao64 (src) `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(161)) ,@(list)))
+(define-instruction _mov64o32a (dst) `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(163)) ,@(list)))
+(define-instruction _mov64o64a (dst) `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(163)) ,@(list)))
+(define-instruction _mov64ri (dst src)
+  (multiple-value-bind (reg-index reg-mode reg-extra-bit)
       (register-name->encoding-bits dst :expected-mode 64)
     `(progn
-      ,@'nil
-      (when (eql ,hu.dwim.genassem::reg-mode 64)
-        (emit-byte
-         (logior 72
-                 ,(if hu.dwim.genassem::reg-extra-bit
-                      hu.dwim.genassem::rex.b
-                      0))))
-      ,@'nil
-      (emit-byte (logior ,'184 ,hu.dwim.genassem::reg-index)))))
-(defmacro _mov8ri (dst src)
-  (multiple-value-bind
-      (hu.dwim.genassem::reg-index hu.dwim.genassem::reg-mode
-       hu.dwim.genassem::reg-extra-bit)
+      (emit-bytes ','nil)
+      ,(when (eql reg-mode 64)
+         `(emit-byte
+           ,(logior 64 rex.w
+                    (if reg-extra-bit
+                        1
+                        0))))
+      (emit-bytes ','nil)
+      (emit-byte ,(logior '184 reg-index)))))
+(define-instruction _mov8ao16 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(160)) ,@(list)))
+(define-instruction _mov8ao32 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(160)) ,@(list)))
+(define-instruction _mov8ao64 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(160)) ,@(list)))
+(define-instruction _mov8o16a (dst) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(162)) ,@(list)))
+(define-instruction _mov8o32a (dst) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(162)) ,@(list)))
+(define-instruction _mov8o64a (dst) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(162)) ,@(list)))
+(define-instruction _mov8ri (dst src)
+  (multiple-value-bind (reg-index reg-mode reg-extra-bit)
       (register-name->encoding-bits dst :expected-mode 8)
     `(progn
-      ,@'nil
-      (when (eql ,hu.dwim.genassem::reg-mode 64)
-        (emit-byte
-         (logior 72
-                 ,(if hu.dwim.genassem::reg-extra-bit
-                      hu.dwim.genassem::rex.b
-                      0))))
-      ,@'nil
-      (emit-byte (logior ,'176 ,hu.dwim.genassem::reg-index)))))
-(defmacro _noop () `(progn ,@'nil ,@'nil (emit-byte ,'144)))
-(defmacro _or16i16 (src) `(progn ,@'nil ,@'nil (emit-byte ,'13)))
-(defmacro _or32i32 (src) `(progn ,@'nil ,@'nil (emit-byte ,'13)))
-(defmacro _or64i32 (src) `(progn ,@'nil ,@'nil (emit-byte ,'13)))
-(defmacro _or8i8 (src) `(progn ,@'nil ,@'nil (emit-byte ,'12)))
-(defmacro _out16ir (port) `(progn ,@'nil ,@'nil (emit-byte ,'231)))
-(defmacro _out16rr () `(progn ,@'nil ,@'nil (emit-byte ,'239)))
-(defmacro _out32ir (port) `(progn ,@'nil ,@'nil (emit-byte ,'231)))
-(defmacro _out32rr () `(progn ,@'nil ,@'nil (emit-byte ,'239)))
-(defmacro _out8ir (port) `(progn ,@'nil ,@'nil (emit-byte ,'230)))
-(defmacro _out8rr () `(progn ,@'nil ,@'nil (emit-byte ,'238)))
-(defmacro _pause () `(progn ,@'((emit-byte 243)) ,@'nil (emit-byte ,'144)))
-(defmacro _pop16r (reg)
-  (multiple-value-bind
-      (hu.dwim.genassem::reg-index hu.dwim.genassem::reg-mode
-       hu.dwim.genassem::reg-extra-bit)
+      (emit-bytes ','nil)
+      ,(when (eql reg-mode 64)
+         `(emit-byte
+           ,(logior 64 rex.w
+                    (if reg-extra-bit
+                        1
+                        0))))
+      (emit-bytes ','nil)
+      (emit-byte ,(logior '176 reg-index)))))
+(define-instruction _movsb () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(164)) ,@(list)))
+(define-instruction _movsl () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(165)) ,@(list)))
+(define-instruction _movsq () `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(165)) ,@(list)))
+(define-instruction _movsw () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(165)) ,@(list)))
+(define-instruction _noop () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(144)) ,@(list)))
+(define-instruction _or16i16 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(13)) ,@(list (emit-forms/imm src 16))))
+(define-instruction _or32i32 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(13)) ,@(list (emit-forms/imm src 32))))
+(define-instruction _or64i32 (src) `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(13)) ,@(list (emit-forms/imm src 32))))
+(define-instruction _or8i8 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(12)) ,@(list (emit-forms/imm src 8))))
+(define-instruction _out16ir (port) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(231)) ,@(list)))
+(define-instruction _out16rr () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(239)) ,@(list)))
+(define-instruction _out32ir (port) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(231)) ,@(list)))
+(define-instruction _out32rr () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(239)) ,@(list)))
+(define-instruction _out8ir (port) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(230)) ,@(list)))
+(define-instruction _out8rr () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(238)) ,@(list)))
+(define-instruction _outsb () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(110)) ,@(list)))
+(define-instruction _outsl () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(111)) ,@(list)))
+(define-instruction _outsw () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(111)) ,@(list)))
+(define-instruction _pause () `(progn (emit-bytes ','(243)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(144)) ,@(list)))
+(define-instruction _pop16r (reg)
+  (multiple-value-bind (reg-index reg-mode reg-extra-bit)
       (register-name->encoding-bits reg :expected-mode 16)
     `(progn
-      ,@'nil
-      (when (eql ,hu.dwim.genassem::reg-mode 64)
-        (emit-byte
-         (logior 72
-                 ,(if hu.dwim.genassem::reg-extra-bit
-                      hu.dwim.genassem::rex.b
-                      0))))
-      ,@'nil
-      (emit-byte (logior ,'88 ,hu.dwim.genassem::reg-index)))))
-(defmacro _pop64r (reg)
-  (multiple-value-bind
-      (hu.dwim.genassem::reg-index hu.dwim.genassem::reg-mode
-       hu.dwim.genassem::reg-extra-bit)
+      (emit-bytes ','nil)
+      ,(when (eql reg-mode 64)
+         `(emit-byte
+           ,(logior 64 rex.w
+                    (if reg-extra-bit
+                        1
+                        0))))
+      (emit-bytes ','nil)
+      (emit-byte ,(logior '88 reg-index)))))
+(define-instruction _pop64r (reg)
+  (multiple-value-bind (reg-index reg-mode reg-extra-bit)
       (register-name->encoding-bits reg :expected-mode 64)
     `(progn
-      ,@'nil
-      (when (eql ,hu.dwim.genassem::reg-mode 64)
-        (emit-byte
-         (logior 72
-                 ,(if hu.dwim.genassem::reg-extra-bit
-                      hu.dwim.genassem::rex.b
-                      0))))
-      ,@'nil
-      (emit-byte (logior ,'88 ,hu.dwim.genassem::reg-index)))))
-(defmacro _popf16 () `(progn ,@'nil ,@'nil (emit-byte ,'157)))
-(defmacro _popf64 () `(progn ,@'nil ,@'nil (emit-byte ,'157)))
-(defmacro _popfs16 () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'161)))
-(defmacro _popfs64 () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'161)))
-(defmacro _popgs16 () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'169)))
-(defmacro _popgs64 () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'169)))
-(defmacro _push16i (imm) `(progn ,@'nil ,@'nil (emit-byte ,'104)))
-(defmacro _push16i8 (imm) `(progn ,@'nil ,@'nil (emit-byte ,'106)))
-(defmacro _push16r (reg)
-  (multiple-value-bind
-      (hu.dwim.genassem::reg-index hu.dwim.genassem::reg-mode
-       hu.dwim.genassem::reg-extra-bit)
+      (emit-bytes ','nil)
+      ,(when (eql reg-mode 64)
+         `(emit-byte
+           ,(logior 64 rex.w
+                    (if reg-extra-bit
+                        1
+                        0))))
+      (emit-bytes ','nil)
+      (emit-byte ,(logior '88 reg-index)))))
+(define-instruction _popf16 () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(157)) ,@(list)))
+(define-instruction _popf64 () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(157)) ,@(list)))
+(define-instruction _popfs16 () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(15 161)) ,@(list)))
+(define-instruction _popfs64 () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(15 161)) ,@(list)))
+(define-instruction _popgs16 () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(15 169)) ,@(list)))
+(define-instruction _popgs64 () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(15 169)) ,@(list)))
+(define-instruction _push16i (imm) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(104)) ,@(list (emit-forms/imm imm 16))))
+(define-instruction _push16i8 (imm) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(106)) ,@(list (emit-forms/imm imm 8))))
+(define-instruction _push16r (reg)
+  (multiple-value-bind (reg-index reg-mode reg-extra-bit)
       (register-name->encoding-bits reg :expected-mode 16)
     `(progn
-      ,@'nil
-      (when (eql ,hu.dwim.genassem::reg-mode 64)
-        (emit-byte
-         (logior 72
-                 ,(if hu.dwim.genassem::reg-extra-bit
-                      hu.dwim.genassem::rex.b
-                      0))))
-      ,@'nil
-      (emit-byte (logior ,'80 ,hu.dwim.genassem::reg-index)))))
-(defmacro _push64i32 (imm) `(progn ,@'nil ,@'nil (emit-byte ,'104)))
-(defmacro _push64i8 (imm) `(progn ,@'nil ,@'nil (emit-byte ,'106)))
-(defmacro _push64r (reg)
-  (multiple-value-bind
-      (hu.dwim.genassem::reg-index hu.dwim.genassem::reg-mode
-       hu.dwim.genassem::reg-extra-bit)
+      (emit-bytes ','nil)
+      ,(when (eql reg-mode 64)
+         `(emit-byte
+           ,(logior 64 rex.w
+                    (if reg-extra-bit
+                        1
+                        0))))
+      (emit-bytes ','nil)
+      (emit-byte ,(logior '80 reg-index)))))
+(define-instruction _push64i32 (imm) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(104)) ,@(list (emit-forms/imm imm 32))))
+(define-instruction _push64i8 (imm) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(106)) ,@(list (emit-forms/imm imm 8))))
+(define-instruction _push64r (reg)
+  (multiple-value-bind (reg-index reg-mode reg-extra-bit)
       (register-name->encoding-bits reg :expected-mode 64)
     `(progn
-      ,@'nil
-      (when (eql ,hu.dwim.genassem::reg-mode 64)
-        (emit-byte
-         (logior 72
-                 ,(if hu.dwim.genassem::reg-extra-bit
-                      hu.dwim.genassem::rex.b
-                      0))))
-      ,@'nil
-      (emit-byte (logior ,'80 ,hu.dwim.genassem::reg-index)))))
-(defmacro _pushf16 () `(progn ,@'nil ,@'nil (emit-byte ,'156)))
-(defmacro _pushf64 () `(progn ,@'nil ,@'nil (emit-byte ,'156)))
-(defmacro _pushfs16 () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'160)))
-(defmacro _pushfs64 () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'160)))
-(defmacro _pushgs16 () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'168)))
-(defmacro _pushgs64 () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'168)))
-(defmacro _rdmsr () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'50)))
-(defmacro _rdpmc () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'51)))
-(defmacro _rdtsc () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'49)))
-; ((!anonymous) (!fields array) (!locs array X86InstrControl.td:27) (!name . RET16) (!superclasses array InstructionEncoding Instruction X86Inst I OpSize16) (AdSize object (def . AdSizeX) (kind . def) (printable . AdSizeX)) (AdSizeBits array 0 0) (AddedComplexity . 0) (AsmMatchConverter . ) (AsmString . ret{w}) (AsmVariantName . ) (CD8_EltSize . 0) (CD8_Form array 0 0 0) (CD8_Scale array 0 0 0 0 0 0 0) (CodeSize . 0) (Constraints . ) (DecoderMethod . ) (DecoderNamespace . ) (Defs array) (DisableEncoding . ) (EncodingInfos . null) (ExeDomain object (def . GenericDomain) (kind . def) (printable . GenericDomain)) (FPForm object (def . SpecialFP) (kind . def) (printable . SpecialFP)) (FastISelShouldIgnore . 0) (ForceDisassemble . 0) (Form object (def . RawFrm) (kind . def) (printable . RawFrm)) (FormBits array 1 0 0 0 0 0 0) (HasPositionOrder . 1) (IgnoresW . 0) (ImmT object (def . NoImm) (kind . def) (printable . NoImm)) (InOperandList object (args array) (kind . dag) (operator object (def . ins) (kind . def) (printable . ins)) (printable . (ins))) (Itinerary object (def . NoItinerary) (kind . def) (printable . NoItinerary)) (Namespace . X86) (OpEnc object (def . EncNormal) (kind . def) (printable . EncNormal)) (OpEncBits array 0 0) (OpMap object (def . OB) (kind . def) (printable . OB)) (OpMapBits array 0 0 0 0) (OpPrefix object (def . NoPrfx) (kind . def) (printable . NoPrfx)) (OpPrefixBits array 0 0 0) (OpSize object (def . OpSize16) (kind . def) (printable . OpSize16)) (OpSizeBits array 1 0) (Opcode array 1 1 0 0 0 0 1 1) (OutOperandList object (args array) (kind . dag) (operator object (def . outs) (kind . def) (printable . outs)) (printable . (outs))) (Pattern array) (PostEncoderMethod . ) (Predicates array) (SchedRW array (object (def . WriteJumpLd) (kind . def) (printable . WriteJumpLd))) (Size . 0) (TSFlags array 1 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 0 0 0 0 0 0 1 1 0 0 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0) (TwoOperandAliasConstraint . ) (UseLogicalOperandMappings . 0) (UseNamedOperandTable . 0) (Uses array) (VectSize array 0 0 0 0 1 0 0) (canFoldAsLoad . 0) (explicitOpPrefix object (def . NoExplicitOpPrefix) (kind . def) (printable . NoExplicitOpPrefix)) (explicitOpPrefixBits array 0 0) (hasCompleteDecoder . 1) (hasCtrlDep . 1) (hasDelaySlot . 0) (hasEVEX_B . 0) (hasEVEX_K . 0) (hasEVEX_L2 . 0) (hasEVEX_NF . 0) (hasEVEX_RC . 0) (hasEVEX_U . 0) (hasEVEX_Z . 0) (hasExtraDefRegAllocReq . 0) (hasExtraSrcRegAllocReq . 0) (hasLockPrefix . 0) (hasNoSchedulingInfo . 0) (hasNoTrackPrefix . 0) (hasPostISelHook . 0) (hasREPPrefix . 0) (hasREX_W . 0) (hasSideEffects . null) (hasTwoConditionalOps . 0) (hasVEX_4V . 0) (hasVEX_L . 0) (ignoresVEX_L . 0) (isAdd . 0) (isAsCheapAsAMove . 0) (isAsmParserOnly . 0) (isAuthenticated . 0) (isBarrier . 1) (isBitcast . 0) (isBranch . 0) (isCall . 0) (isCodeGenOnly . 0) (isCommutable . 0) (isCompare . 0) (isConvergent . 0) (isConvertibleToThreeAddress . 0) (isEHScopeReturn . 0) (isExtractSubreg . 0) (isIndirectBranch . 0) (isInsertSubreg . 0) (isMeta . 0) (isMoveImm . 0) (isMoveReg . 0) (isNotDuplicable . 0) (isPreISelOpcode . 0) (isPredicable . 0) (isPseudo . 0) (isReMaterializable . 0) (isRegSequence . 0) (isReturn . 1) (isSelect . 0) (isTerminator . 1) (isTrap . 0) (isUnpredicable . 0) (mayLoad . null) (mayRaiseFPException . 0) (mayStore . null) (usesCustomInserter . 0) (variadicOpsAreDefs . 0))
-(defmacro _ret16 () `(progn ,@'nil ,@'nil (emit-byte ,'195)))
-; ((!anonymous) (!fields array) (!locs array X86InstrControl.td:23) (!name . RET32) (!superclasses array InstructionEncoding Instruction X86Inst I OpSize32 Requires) (AdSize object (def . AdSizeX) (kind . def) (printable . AdSizeX)) (AdSizeBits array 0 0) (AddedComplexity . 0) (AsmMatchConverter . ) (AsmString . ret{l}) (AsmVariantName . ) (CD8_EltSize . 0) (CD8_Form array 0 0 0) (CD8_Scale array 0 0 0 0 0 0 0) (CodeSize . 0) (Constraints . ) (DecoderMethod . ) (DecoderNamespace . ) (Defs array) (DisableEncoding . ) (EncodingInfos . null) (ExeDomain object (def . GenericDomain) (kind . def) (printable . GenericDomain)) (FPForm object (def . SpecialFP) (kind . def) (printable . SpecialFP)) (FastISelShouldIgnore . 0) (ForceDisassemble . 0) (Form object (def . RawFrm) (kind . def) (printable . RawFrm)) (FormBits array 1 0 0 0 0 0 0) (HasPositionOrder . 1) (IgnoresW . 0) (ImmT object (def . NoImm) (kind . def) (printable . NoImm)) (InOperandList object (args array (array (object (def . variable_ops) (kind . def) (printable . variable_ops)) null)) (kind . dag) (operator object (def . ins) (kind . def) (printable . ins)) (printable . (ins variable_ops))) (Itinerary object (def . NoItinerary) (kind . def) (printable . NoItinerary)) (Namespace . X86) (OpEnc object (def . EncNormal) (kind . def) (printable . EncNormal)) (OpEncBits array 0 0) (OpMap object (def . OB) (kind . def) (printable . OB)) (OpMapBits array 0 0 0 0) (OpPrefix object (def . NoPrfx) (kind . def) (printable . NoPrfx)) (OpPrefixBits array 0 0 0) (OpSize object (def . OpSize32) (kind . def) (printable . OpSize32)) (OpSizeBits array 0 1) (Opcode array 1 1 0 0 0 0 1 1) (OutOperandList object (args array) (kind . dag) (operator object (def . outs) (kind . def) (printable . outs)) (printable . (outs))) (Pattern array) (PostEncoderMethod . ) (Predicates array (object (def . Not64BitMode) (kind . def) (printable . Not64BitMode))) (SchedRW array (object (def . WriteJumpLd) (kind . def) (printable . WriteJumpLd))) (Size . 0) (TSFlags array 1 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 0 0 0 0 0 0 1 1 0 0 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0) (TwoOperandAliasConstraint . ) (UseLogicalOperandMappings . 0) (UseNamedOperandTable . 0) (Uses array) (VectSize array 0 0 0 0 1 0 0) (canFoldAsLoad . 0) (explicitOpPrefix object (def . NoExplicitOpPrefix) (kind . def) (printable . NoExplicitOpPrefix)) (explicitOpPrefixBits array 0 0) (hasCompleteDecoder . 1) (hasCtrlDep . 1) (hasDelaySlot . 0) (hasEVEX_B . 0) (hasEVEX_K . 0) (hasEVEX_L2 . 0) (hasEVEX_NF . 0) (hasEVEX_RC . 0) (hasEVEX_U . 0) (hasEVEX_Z . 0) (hasExtraDefRegAllocReq . 0) (hasExtraSrcRegAllocReq . 0) (hasLockPrefix . 0) (hasNoSchedulingInfo . 0) (hasNoTrackPrefix . 0) (hasPostISelHook . 0) (hasREPPrefix . 0) (hasREX_W . 0) (hasSideEffects . null) (hasTwoConditionalOps . 0) (hasVEX_4V . 0) (hasVEX_L . 0) (ignoresVEX_L . 0) (isAdd . 0) (isAsCheapAsAMove . 0) (isAsmParserOnly . 0) (isAuthenticated . 0) (isBarrier . 1) (isBitcast . 0) (isBranch . 0) (isCall . 0) (isCodeGenOnly . 0) (isCommutable . 0) (isCompare . 0) (isConvergent . 0) (isConvertibleToThreeAddress . 0) (isEHScopeReturn . 0) (isExtractSubreg . 0) (isIndirectBranch . 0) (isInsertSubreg . 0) (isMeta . 0) (isMoveImm . 0) (isMoveReg . 0) (isNotDuplicable . 0) (isPreISelOpcode . 0) (isPredicable . 0) (isPseudo . 0) (isReMaterializable . 0) (isRegSequence . 0) (isReturn . 1) (isSelect . 0) (isTerminator . 1) (isTrap . 0) (isUnpredicable . 0) (mayLoad . null) (mayRaiseFPException . 0) (mayStore . null) (usesCustomInserter . 0) (variadicOpsAreDefs . 0))
-; ((!anonymous) (!fields array) (!locs array X86InstrControl.td:25) (!name . RET64) (!superclasses array InstructionEncoding Instruction X86Inst I OpSize32 Requires) (AdSize object (def . AdSizeX) (kind . def) (printable . AdSizeX)) (AdSizeBits array 0 0) (AddedComplexity . 0) (AsmMatchConverter . ) (AsmString . ret{q}) (AsmVariantName . ) (CD8_EltSize . 0) (CD8_Form array 0 0 0) (CD8_Scale array 0 0 0 0 0 0 0) (CodeSize . 0) (Constraints . ) (DecoderMethod . ) (DecoderNamespace . ) (Defs array) (DisableEncoding . ) (EncodingInfos . null) (ExeDomain object (def . GenericDomain) (kind . def) (printable . GenericDomain)) (FPForm object (def . SpecialFP) (kind . def) (printable . SpecialFP)) (FastISelShouldIgnore . 0) (ForceDisassemble . 0) (Form object (def . RawFrm) (kind . def) (printable . RawFrm)) (FormBits array 1 0 0 0 0 0 0) (HasPositionOrder . 1) (IgnoresW . 0) (ImmT object (def . NoImm) (kind . def) (printable . NoImm)) (InOperandList object (args array (array (object (def . variable_ops) (kind . def) (printable . variable_ops)) null)) (kind . dag) (operator object (def . ins) (kind . def) (printable . ins)) (printable . (ins variable_ops))) (Itinerary object (def . NoItinerary) (kind . def) (printable . NoItinerary)) (Namespace . X86) (OpEnc object (def . EncNormal) (kind . def) (printable . EncNormal)) (OpEncBits array 0 0) (OpMap object (def . OB) (kind . def) (printable . OB)) (OpMapBits array 0 0 0 0) (OpPrefix object (def . NoPrfx) (kind . def) (printable . NoPrfx)) (OpPrefixBits array 0 0 0) (OpSize object (def . OpSize32) (kind . def) (printable . OpSize32)) (OpSizeBits array 0 1) (Opcode array 1 1 0 0 0 0 1 1) (OutOperandList object (args array) (kind . dag) (operator object (def . outs) (kind . def) (printable . outs)) (printable . (outs))) (Pattern array) (PostEncoderMethod . ) (Predicates array (object (def . In64BitMode) (kind . def) (printable . In64BitMode))) (SchedRW array (object (def . WriteJumpLd) (kind . def) (printable . WriteJumpLd))) (Size . 0) (TSFlags array 1 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 0 0 0 0 0 0 1 1 0 0 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0) (TwoOperandAliasConstraint . ) (UseLogicalOperandMappings . 0) (UseNamedOperandTable . 0) (Uses array) (VectSize array 0 0 0 0 1 0 0) (canFoldAsLoad . 0) (explicitOpPrefix object (def . NoExplicitOpPrefix) (kind . def) (printable . NoExplicitOpPrefix)) (explicitOpPrefixBits array 0 0) (hasCompleteDecoder . 1) (hasCtrlDep . 1) (hasDelaySlot . 0) (hasEVEX_B . 0) (hasEVEX_K . 0) (hasEVEX_L2 . 0) (hasEVEX_NF . 0) (hasEVEX_RC . 0) (hasEVEX_U . 0) (hasEVEX_Z . 0) (hasExtraDefRegAllocReq . 0) (hasExtraSrcRegAllocReq . 0) (hasLockPrefix . 0) (hasNoSchedulingInfo . 0) (hasNoTrackPrefix . 0) (hasPostISelHook . 0) (hasREPPrefix . 0) (hasREX_W . 0) (hasSideEffects . null) (hasTwoConditionalOps . 0) (hasVEX_4V . 0) (hasVEX_L . 0) (ignoresVEX_L . 0) (isAdd . 0) (isAsCheapAsAMove . 0) (isAsmParserOnly . 0) (isAuthenticated . 0) (isBarrier . 1) (isBitcast . 0) (isBranch . 0) (isCall . 0) (isCodeGenOnly . 0) (isCommutable . 0) (isCompare . 0) (isConvergent . 0) (isConvertibleToThreeAddress . 0) (isEHScopeReturn . 0) (isExtractSubreg . 0) (isIndirectBranch . 0) (isInsertSubreg . 0) (isMeta . 0) (isMoveImm . 0) (isMoveReg . 0) (isNotDuplicable . 0) (isPreISelOpcode . 0) (isPredicable . 0) (isPseudo . 0) (isReMaterializable . 0) (isRegSequence . 0) (isReturn . 1) (isSelect . 0) (isTerminator . 1) (isTrap . 0) (isUnpredicable . 0) (mayLoad . null) (mayRaiseFPException . 0) (mayStore . null) (usesCustomInserter . 0) (variadicOpsAreDefs . 0))
-(defmacro _ret64 () `(progn ,@'nil ,@'nil (emit-byte ,'195)))
-; ((!anonymous) (!fields array) (!locs array X86InstrControl.td:33) (!name . RETI16) (!superclasses array InstructionEncoding Instruction X86Inst Ii16 OpSize16) (AdSize object (def . AdSizeX) (kind . def) (printable . AdSizeX)) (AdSizeBits array 0 0) (AddedComplexity . 0) (AsmMatchConverter . ) (AsmString . ret{w}	$amt) (AsmVariantName . ) (CD8_EltSize . 0) (CD8_Form array 0 0 0) (CD8_Scale array 0 0 0 0 0 0 0) (CodeSize . 0) (Constraints . ) (DecoderMethod . ) (DecoderNamespace . ) (Defs array) (DisableEncoding . ) (EncodingInfos . null) (ExeDomain object (def . GenericDomain) (kind . def) (printable . GenericDomain)) (FPForm object (def . SpecialFP) (kind . def) (printable . SpecialFP)) (FastISelShouldIgnore . 0) (ForceDisassemble . 0) (Form object (def . RawFrm) (kind . def) (printable . RawFrm)) (FormBits array 1 0 0 0 0 0 0) (HasPositionOrder . 1) (IgnoresW . 0) (ImmT object (def . Imm16) (kind . def) (printable . Imm16)) (InOperandList object (args array (array (object (def . i16imm) (kind . def) (printable . i16imm)) amt)) (kind . dag) (operator object (def . ins) (kind . def) (printable . ins)) (printable . (ins i16imm:$amt))) (Itinerary object (def . NoItinerary) (kind . def) (printable . NoItinerary)) (Namespace . X86) (OpEnc object (def . EncNormal) (kind . def) (printable . EncNormal)) (OpEncBits array 0 0) (OpMap object (def . OB) (kind . def) (printable . OB)) (OpMapBits array 0 0 0 0) (OpPrefix object (def . NoPrfx) (kind . def) (printable . NoPrfx)) (OpPrefixBits array 0 0 0) (OpSize object (def . OpSize16) (kind . def) (printable . OpSize16)) (OpSizeBits array 1 0) (Opcode array 0 1 0 0 0 0 1 1) (OutOperandList object (args array) (kind . dag) (operator object (def . outs) (kind . def) (printable . outs)) (printable . (outs))) (Pattern array) (PostEncoderMethod . ) (Predicates array) (SchedRW array (object (def . WriteJumpLd) (kind . def) (printable . WriteJumpLd))) (Size . 0) (TSFlags array 1 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0 1 1 1 0 0 0 0 0 0 0 1 0 0 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0) (TwoOperandAliasConstraint . ) (UseLogicalOperandMappings . 0) (UseNamedOperandTable . 0) (Uses array) (VectSize array 0 0 0 0 1 0 0) (canFoldAsLoad . 0) (explicitOpPrefix object (def . NoExplicitOpPrefix) (kind . def) (printable . NoExplicitOpPrefix)) (explicitOpPrefixBits array 0 0) (hasCompleteDecoder . 1) (hasCtrlDep . 1) (hasDelaySlot . 0) (hasEVEX_B . 0) (hasEVEX_K . 0) (hasEVEX_L2 . 0) (hasEVEX_NF . 0) (hasEVEX_RC . 0) (hasEVEX_U . 0) (hasEVEX_Z . 0) (hasExtraDefRegAllocReq . 0) (hasExtraSrcRegAllocReq . 0) (hasLockPrefix . 0) (hasNoSchedulingInfo . 0) (hasNoTrackPrefix . 0) (hasPostISelHook . 0) (hasREPPrefix . 0) (hasREX_W . 0) (hasSideEffects . null) (hasTwoConditionalOps . 0) (hasVEX_4V . 0) (hasVEX_L . 0) (ignoresVEX_L . 0) (isAdd . 0) (isAsCheapAsAMove . 0) (isAsmParserOnly . 0) (isAuthenticated . 0) (isBarrier . 1) (isBitcast . 0) (isBranch . 0) (isCall . 0) (isCodeGenOnly . 0) (isCommutable . 0) (isCompare . 0) (isConvergent . 0) (isConvertibleToThreeAddress . 0) (isEHScopeReturn . 0) (isExtractSubreg . 0) (isIndirectBranch . 0) (isInsertSubreg . 0) (isMeta . 0) (isMoveImm . 0) (isMoveReg . 0) (isNotDuplicable . 0) (isPreISelOpcode . 0) (isPredicable . 0) (isPseudo . 0) (isReMaterializable . 0) (isRegSequence . 0) (isReturn . 1) (isSelect . 0) (isTerminator . 1) (isTrap . 0) (isUnpredicable . 0) (mayLoad . null) (mayRaiseFPException . 0) (mayStore . null) (usesCustomInserter . 0) (variadicOpsAreDefs . 0))
-(defmacro _reti16 (amt) `(progn ,@'nil ,@'nil (emit-byte ,'194)))
-; ((!anonymous) (!fields array) (!locs array X86InstrControl.td:29) (!name . RETI32) (!superclasses array InstructionEncoding Instruction X86Inst Ii16 OpSize32 Requires) (AdSize object (def . AdSizeX) (kind . def) (printable . AdSizeX)) (AdSizeBits array 0 0) (AddedComplexity . 0) (AsmMatchConverter . ) (AsmString . ret{l}	$amt) (AsmVariantName . ) (CD8_EltSize . 0) (CD8_Form array 0 0 0) (CD8_Scale array 0 0 0 0 0 0 0) (CodeSize . 0) (Constraints . ) (DecoderMethod . ) (DecoderNamespace . ) (Defs array) (DisableEncoding . ) (EncodingInfos . null) (ExeDomain object (def . GenericDomain) (kind . def) (printable . GenericDomain)) (FPForm object (def . SpecialFP) (kind . def) (printable . SpecialFP)) (FastISelShouldIgnore . 0) (ForceDisassemble . 0) (Form object (def . RawFrm) (kind . def) (printable . RawFrm)) (FormBits array 1 0 0 0 0 0 0) (HasPositionOrder . 1) (IgnoresW . 0) (ImmT object (def . Imm16) (kind . def) (printable . Imm16)) (InOperandList object (args array (array (object (def . i16imm) (kind . def) (printable . i16imm)) amt) (array (object (def . variable_ops) (kind . def) (printable . variable_ops)) null)) (kind . dag) (operator object (def . ins) (kind . def) (printable . ins)) (printable . (ins i16imm:$amt, variable_ops))) (Itinerary object (def . NoItinerary) (kind . def) (printable . NoItinerary)) (Namespace . X86) (OpEnc object (def . EncNormal) (kind . def) (printable . EncNormal)) (OpEncBits array 0 0) (OpMap object (def . OB) (kind . def) (printable . OB)) (OpMapBits array 0 0 0 0) (OpPrefix object (def . NoPrfx) (kind . def) (printable . NoPrfx)) (OpPrefixBits array 0 0 0) (OpSize object (def . OpSize32) (kind . def) (printable . OpSize32)) (OpSizeBits array 0 1) (Opcode array 0 1 0 0 0 0 1 1) (OutOperandList object (args array) (kind . dag) (operator object (def . outs) (kind . def) (printable . outs)) (printable . (outs))) (Pattern array) (PostEncoderMethod . ) (Predicates array (object (def . Not64BitMode) (kind . def) (printable . Not64BitMode))) (SchedRW array (object (def . WriteJumpLd) (kind . def) (printable . WriteJumpLd))) (Size . 0) (TSFlags array 1 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0 1 1 1 0 0 0 0 0 0 0 1 0 0 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0) (TwoOperandAliasConstraint . ) (UseLogicalOperandMappings . 0) (UseNamedOperandTable . 0) (Uses array) (VectSize array 0 0 0 0 1 0 0) (canFoldAsLoad . 0) (explicitOpPrefix object (def . NoExplicitOpPrefix) (kind . def) (printable . NoExplicitOpPrefix)) (explicitOpPrefixBits array 0 0) (hasCompleteDecoder . 1) (hasCtrlDep . 1) (hasDelaySlot . 0) (hasEVEX_B . 0) (hasEVEX_K . 0) (hasEVEX_L2 . 0) (hasEVEX_NF . 0) (hasEVEX_RC . 0) (hasEVEX_U . 0) (hasEVEX_Z . 0) (hasExtraDefRegAllocReq . 0) (hasExtraSrcRegAllocReq . 0) (hasLockPrefix . 0) (hasNoSchedulingInfo . 0) (hasNoTrackPrefix . 0) (hasPostISelHook . 0) (hasREPPrefix . 0) (hasREX_W . 0) (hasSideEffects . null) (hasTwoConditionalOps . 0) (hasVEX_4V . 0) (hasVEX_L . 0) (ignoresVEX_L . 0) (isAdd . 0) (isAsCheapAsAMove . 0) (isAsmParserOnly . 0) (isAuthenticated . 0) (isBarrier . 1) (isBitcast . 0) (isBranch . 0) (isCall . 0) (isCodeGenOnly . 0) (isCommutable . 0) (isCompare . 0) (isConvergent . 0) (isConvertibleToThreeAddress . 0) (isEHScopeReturn . 0) (isExtractSubreg . 0) (isIndirectBranch . 0) (isInsertSubreg . 0) (isMeta . 0) (isMoveImm . 0) (isMoveReg . 0) (isNotDuplicable . 0) (isPreISelOpcode . 0) (isPredicable . 0) (isPseudo . 0) (isReMaterializable . 0) (isRegSequence . 0) (isReturn . 1) (isSelect . 0) (isTerminator . 1) (isTrap . 0) (isUnpredicable . 0) (mayLoad . null) (mayRaiseFPException . 0) (mayStore . null) (usesCustomInserter . 0) (variadicOpsAreDefs . 0))
-; ((!anonymous) (!fields array) (!locs array X86InstrControl.td:31) (!name . RETI64) (!superclasses array InstructionEncoding Instruction X86Inst Ii16 OpSize32 Requires) (AdSize object (def . AdSizeX) (kind . def) (printable . AdSizeX)) (AdSizeBits array 0 0) (AddedComplexity . 0) (AsmMatchConverter . ) (AsmString . ret{q}	$amt) (AsmVariantName . ) (CD8_EltSize . 0) (CD8_Form array 0 0 0) (CD8_Scale array 0 0 0 0 0 0 0) (CodeSize . 0) (Constraints . ) (DecoderMethod . ) (DecoderNamespace . ) (Defs array) (DisableEncoding . ) (EncodingInfos . null) (ExeDomain object (def . GenericDomain) (kind . def) (printable . GenericDomain)) (FPForm object (def . SpecialFP) (kind . def) (printable . SpecialFP)) (FastISelShouldIgnore . 0) (ForceDisassemble . 0) (Form object (def . RawFrm) (kind . def) (printable . RawFrm)) (FormBits array 1 0 0 0 0 0 0) (HasPositionOrder . 1) (IgnoresW . 0) (ImmT object (def . Imm16) (kind . def) (printable . Imm16)) (InOperandList object (args array (array (object (def . i16imm) (kind . def) (printable . i16imm)) amt) (array (object (def . variable_ops) (kind . def) (printable . variable_ops)) null)) (kind . dag) (operator object (def . ins) (kind . def) (printable . ins)) (printable . (ins i16imm:$amt, variable_ops))) (Itinerary object (def . NoItinerary) (kind . def) (printable . NoItinerary)) (Namespace . X86) (OpEnc object (def . EncNormal) (kind . def) (printable . EncNormal)) (OpEncBits array 0 0) (OpMap object (def . OB) (kind . def) (printable . OB)) (OpMapBits array 0 0 0 0) (OpPrefix object (def . NoPrfx) (kind . def) (printable . NoPrfx)) (OpPrefixBits array 0 0 0) (OpSize object (def . OpSize32) (kind . def) (printable . OpSize32)) (OpSizeBits array 0 1) (Opcode array 0 1 0 0 0 0 1 1) (OutOperandList object (args array) (kind . dag) (operator object (def . outs) (kind . def) (printable . outs)) (printable . (outs))) (Pattern array) (PostEncoderMethod . ) (Predicates array (object (def . In64BitMode) (kind . def) (printable . In64BitMode))) (SchedRW array (object (def . WriteJumpLd) (kind . def) (printable . WriteJumpLd))) (Size . 0) (TSFlags array 1 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0 1 1 1 0 0 0 0 0 0 0 1 0 0 0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0) (TwoOperandAliasConstraint . ) (UseLogicalOperandMappings . 0) (UseNamedOperandTable . 0) (Uses array) (VectSize array 0 0 0 0 1 0 0) (canFoldAsLoad . 0) (explicitOpPrefix object (def . NoExplicitOpPrefix) (kind . def) (printable . NoExplicitOpPrefix)) (explicitOpPrefixBits array 0 0) (hasCompleteDecoder . 1) (hasCtrlDep . 1) (hasDelaySlot . 0) (hasEVEX_B . 0) (hasEVEX_K . 0) (hasEVEX_L2 . 0) (hasEVEX_NF . 0) (hasEVEX_RC . 0) (hasEVEX_U . 0) (hasEVEX_Z . 0) (hasExtraDefRegAllocReq . 0) (hasExtraSrcRegAllocReq . 0) (hasLockPrefix . 0) (hasNoSchedulingInfo . 0) (hasNoTrackPrefix . 0) (hasPostISelHook . 0) (hasREPPrefix . 0) (hasREX_W . 0) (hasSideEffects . null) (hasTwoConditionalOps . 0) (hasVEX_4V . 0) (hasVEX_L . 0) (ignoresVEX_L . 0) (isAdd . 0) (isAsCheapAsAMove . 0) (isAsmParserOnly . 0) (isAuthenticated . 0) (isBarrier . 1) (isBitcast . 0) (isBranch . 0) (isCall . 0) (isCodeGenOnly . 0) (isCommutable . 0) (isCompare . 0) (isConvergent . 0) (isConvertibleToThreeAddress . 0) (isEHScopeReturn . 0) (isExtractSubreg . 0) (isIndirectBranch . 0) (isInsertSubreg . 0) (isMeta . 0) (isMoveImm . 0) (isMoveReg . 0) (isNotDuplicable . 0) (isPreISelOpcode . 0) (isPredicable . 0) (isPseudo . 0) (isReMaterializable . 0) (isRegSequence . 0) (isReturn . 1) (isSelect . 0) (isTerminator . 1) (isTrap . 0) (isUnpredicable . 0) (mayLoad . null) (mayRaiseFPException . 0) (mayStore . null) (usesCustomInserter . 0) (variadicOpsAreDefs . 0))
-(defmacro _reti64 (amt) `(progn ,@'nil ,@'nil (emit-byte ,'194)))
-(defmacro _rsm () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'170)))
-(defmacro _sahf () `(progn ,@'nil ,@'nil (emit-byte ,'158)))
-(defmacro _sbb16i16 (src) `(progn ,@'nil ,@'nil (emit-byte ,'29)))
-(defmacro _sbb32i32 (src) `(progn ,@'nil ,@'nil (emit-byte ,'29)))
-(defmacro _sbb64i32 (src) `(progn ,@'nil ,@'nil (emit-byte ,'29)))
-(defmacro _sbb8i8 (src) `(progn ,@'nil ,@'nil (emit-byte ,'28)))
-(defmacro _stc () `(progn ,@'nil ,@'nil (emit-byte ,'249)))
-(defmacro _std () `(progn ,@'nil ,@'nil (emit-byte ,'253)))
-(defmacro _sti () `(progn ,@'nil ,@'nil (emit-byte ,'251)))
-(defmacro _sub16i16 (src) `(progn ,@'nil ,@'nil (emit-byte ,'45)))
-(defmacro _sub32i32 (src) `(progn ,@'nil ,@'nil (emit-byte ,'45)))
-(defmacro _sub64i32 (src) `(progn ,@'nil ,@'nil (emit-byte ,'45)))
-(defmacro _sub8i8 (src) `(progn ,@'nil ,@'nil (emit-byte ,'44)))
-(defmacro _syscall () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'5)))
-(defmacro _sysenter () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'52)))
-(defmacro _sysexit () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'53)))
-(defmacro _sysexit64 () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'53)))
-(defmacro _sysret () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'7)))
-(defmacro _sysret64 () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'7)))
-(defmacro _test16i16 (src) `(progn ,@'nil ,@'nil (emit-byte ,'169)))
-(defmacro _test32i32 (src) `(progn ,@'nil ,@'nil (emit-byte ,'169)))
-(defmacro _test64i32 (src) `(progn ,@'nil ,@'nil (emit-byte ,'169)))
-(defmacro _test8i8 (src) `(progn ,@'nil ,@'nil (emit-byte ,'168)))
-(defmacro _trap () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'11)))
-(defmacro _wait () `(progn ,@'nil ,@'nil (emit-byte ,'155)))
-(defmacro _wbinvd ()
-  `(progn ,@'((emit-byte 243)) ,@'((emit-byte 15)) (emit-byte ,'9)))
-(defmacro _wrmsr () `(progn ,@'nil ,@'((emit-byte 15)) (emit-byte ,'48)))
-(defmacro _xchg16ar (src)
-  (multiple-value-bind
-      (hu.dwim.genassem::reg-index hu.dwim.genassem::reg-mode
-       hu.dwim.genassem::reg-extra-bit)
+      (emit-bytes ','nil)
+      ,(when (eql reg-mode 64)
+         `(emit-byte
+           ,(logior 64 rex.w
+                    (if reg-extra-bit
+                        1
+                        0))))
+      (emit-bytes ','nil)
+      (emit-byte ,(logior '80 reg-index)))))
+(define-instruction _pushf16 () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(156)) ,@(list)))
+(define-instruction _pushf64 () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(156)) ,@(list)))
+(define-instruction _pushfs16 () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(15 160)) ,@(list)))
+(define-instruction _pushfs64 () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(15 160)) ,@(list)))
+(define-instruction _pushgs16 () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(15 168)) ,@(list)))
+(define-instruction _pushgs64 () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(15 168)) ,@(list)))
+(define-instruction _rdmsr () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(15 50)) ,@(list)))
+(define-instruction _rdpmc () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(15 51)) ,@(list)))
+(define-instruction _rdtsc () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(15 49)) ,@(list)))
+(define-instruction _ret16 () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(195)) ,@(list)))
+(define-instruction _ret64 () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(195)) ,@(list)))
+(define-instruction _reti16 (amt) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(194)) ,@(list (emit-forms/imm amt 16))))
+(define-instruction _reti64 (amt) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(194)) ,@(list (emit-forms/imm amt 16))))
+(define-instruction _rsm () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(15 170)) ,@(list)))
+(define-instruction _sahf () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(158)) ,@(list)))
+(define-instruction _sbb16i16 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(29)) ,@(list (emit-forms/imm src 16))))
+(define-instruction _sbb32i32 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(29)) ,@(list (emit-forms/imm src 32))))
+(define-instruction _sbb64i32 (src) `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(29)) ,@(list (emit-forms/imm src 32))))
+(define-instruction _sbb8i8 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(28)) ,@(list (emit-forms/imm src 8))))
+(define-instruction _scasb () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(174)) ,@(list)))
+(define-instruction _scasl () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(175)) ,@(list)))
+(define-instruction _scasq () `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(175)) ,@(list)))
+(define-instruction _scasw () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(175)) ,@(list)))
+(define-instruction _stc () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(249)) ,@(list)))
+(define-instruction _std () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(253)) ,@(list)))
+(define-instruction _sti () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(251)) ,@(list)))
+(define-instruction _stosb () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(170)) ,@(list)))
+(define-instruction _stosl () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(171)) ,@(list)))
+(define-instruction _stosq () `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(171)) ,@(list)))
+(define-instruction _stosw () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(171)) ,@(list)))
+(define-instruction _sub16i16 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(45)) ,@(list (emit-forms/imm src 16))))
+(define-instruction _sub32i32 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(45)) ,@(list (emit-forms/imm src 32))))
+(define-instruction _sub64i32 (src) `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(45)) ,@(list (emit-forms/imm src 32))))
+(define-instruction _sub8i8 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(44)) ,@(list (emit-forms/imm src 8))))
+(define-instruction _syscall () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(15 5)) ,@(list)))
+(define-instruction _sysenter () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(15 52)) ,@(list)))
+(define-instruction _sysexit () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(15 53)) ,@(list)))
+(define-instruction _sysexit64 () `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(15 53)) ,@(list)))
+(define-instruction _sysret () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(15 7)) ,@(list)))
+(define-instruction _sysret64 () `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(15 7)) ,@(list)))
+(define-instruction _test16i16 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(169)) ,@(list (emit-forms/imm src 16))))
+(define-instruction _test32i32 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(169)) ,@(list (emit-forms/imm src 32))))
+(define-instruction _test64i32 (src) `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(169)) ,@(list (emit-forms/imm src 32))))
+(define-instruction _test8i8 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(168)) ,@(list (emit-forms/imm src 8))))
+(define-instruction _trap () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(15 11)) ,@(list)))
+(define-instruction _wait () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(155)) ,@(list)))
+(define-instruction _wbinvd () `(progn (emit-bytes ','(243)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(15 9)) ,@(list)))
+(define-instruction _wrmsr () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(15 48)) ,@(list)))
+(define-instruction _xchg16ar (src)
+  (multiple-value-bind (reg-index reg-mode reg-extra-bit)
       (register-name->encoding-bits src :expected-mode 16)
     `(progn
-      ,@'nil
-      (when (eql ,hu.dwim.genassem::reg-mode 64)
-        (emit-byte
-         (logior 72
-                 ,(if hu.dwim.genassem::reg-extra-bit
-                      hu.dwim.genassem::rex.b
-                      0))))
-      ,@'nil
-      (emit-byte (logior ,'144 ,hu.dwim.genassem::reg-index)))))
-(defmacro _xchg32ar (src)
-  (multiple-value-bind
-      (hu.dwim.genassem::reg-index hu.dwim.genassem::reg-mode
-       hu.dwim.genassem::reg-extra-bit)
+      (emit-bytes ','nil)
+      ,(when (eql reg-mode 64)
+         `(emit-byte
+           ,(logior 64 rex.w
+                    (if reg-extra-bit
+                        1
+                        0))))
+      (emit-bytes ','nil)
+      (emit-byte ,(logior '144 reg-index)))))
+(define-instruction _xchg32ar (src)
+  (multiple-value-bind (reg-index reg-mode reg-extra-bit)
       (register-name->encoding-bits src :expected-mode 32)
     `(progn
-      ,@'nil
-      (when (eql ,hu.dwim.genassem::reg-mode 64)
-        (emit-byte
-         (logior 72
-                 ,(if hu.dwim.genassem::reg-extra-bit
-                      hu.dwim.genassem::rex.b
-                      0))))
-      ,@'nil
-      (emit-byte (logior ,'144 ,hu.dwim.genassem::reg-index)))))
-(defmacro _xchg64ar (src)
-  (multiple-value-bind
-      (hu.dwim.genassem::reg-index hu.dwim.genassem::reg-mode
-       hu.dwim.genassem::reg-extra-bit)
+      (emit-bytes ','nil)
+      ,(when (eql reg-mode 64)
+         `(emit-byte
+           ,(logior 64 rex.w
+                    (if reg-extra-bit
+                        1
+                        0))))
+      (emit-bytes ','nil)
+      (emit-byte ,(logior '144 reg-index)))))
+(define-instruction _xchg64ar (src)
+  (multiple-value-bind (reg-index reg-mode reg-extra-bit)
       (register-name->encoding-bits src :expected-mode 64)
     `(progn
-      ,@'nil
-      (when (eql ,hu.dwim.genassem::reg-mode 64)
-        (emit-byte
-         (logior 72
-                 ,(if hu.dwim.genassem::reg-extra-bit
-                      hu.dwim.genassem::rex.b
-                      0))))
-      ,@'nil
-      (emit-byte (logior ,'144 ,hu.dwim.genassem::reg-index)))))
-(defmacro _xlat () `(progn ,@'nil ,@'nil (emit-byte ,'215)))
-(defmacro _xor16i16 (src) `(progn ,@'nil ,@'nil (emit-byte ,'53)))
-(defmacro _xor32i32 (src) `(progn ,@'nil ,@'nil (emit-byte ,'53)))
-(defmacro _xor64i32 (src) `(progn ,@'nil ,@'nil (emit-byte ,'53)))
-(defmacro _xor8i8 (src) `(progn ,@'nil ,@'nil (emit-byte ,'52)))
+      (emit-bytes ','nil)
+      ,(when (eql reg-mode 64)
+         `(emit-byte
+           ,(logior 64 rex.w
+                    (if reg-extra-bit
+                        1
+                        0))))
+      (emit-bytes ','nil)
+      (emit-byte ,(logior '144 reg-index)))))
+(define-instruction _xlat () `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(215)) ,@(list)))
+(define-instruction _xor16i16 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize16|) (emit-byte 102)) (emit-bytes ','(53)) ,@(list (emit-forms/imm src 16))))
+(define-instruction _xor32i32 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSize32|) (emit-byte 102)) (emit-bytes ','(53)) ,@(list (emit-forms/imm src 32))))
+(define-instruction _xor64i32 (src) `(progn (emit-bytes ','(72)) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(53)) ,@(list (emit-forms/imm src 32))))
+(define-instruction _xor8i8 (src) `(progn (emit-bytes ','nil) (when (needs-operand-size-prefix? ',':|OpSizeFixed|) (emit-byte 102)) (emit-bytes ','(52)) ,@(list (emit-forms/imm src 8))))
 (export
- '(_xor8i8 _xor64i32 _xor32i32 _xor16i16 _xlat _xchg64ar _xchg32ar _xchg16ar
-           _wrmsr _wbinvd _wait _trap _test8i8 _test64i32 _test32i32 _test16i16
-           _sysret64 _sysret _sysexit64 _sysexit _sysenter _syscall _sub8i8
-           _sub64i32 _sub32i32 _sub16i16 _sti _std _stc _sbb8i8 _sbb64i32
-           _sbb32i32 _sbb16i16 _sahf _rsm _reti64 _reti16 _ret64 _ret16 _rdtsc
-           _rdpmc _rdmsr _pushgs64 _pushgs16 _pushfs64 _pushfs16 _pushf64
-           _pushf16 _push64r _push64i8 _push64i32 _push16r _push16i8 _push16i
-           _popgs64 _popgs16 _popfs64 _popfs16 _popf64 _popf16 _pop64r _pop16r
-           _pause _out8rr _out8ir _out32rr _out32ir _out16rr _out16ir _or8i8
-           _or64i32 _or32i32 _or16i16 _noop _mov8ri _mov64ri _mov32ri _mov16ri
-           _mmx_emms _lreti64 _lreti32 _lreti16 _lret64 _lret32 _lret16 _loopne
-           _loope _loop _leave64 _lahf _jrcxz _jmp_1 _jecxz _iret64 _iret32
-           _iret16 _invd _int3 _int _in8rr _in8ri _in32rr _in32ri _in16rr
-           _in16ri _hlt _getsec _femms _cwde _cwd _cqo _cpuid _cmp8i8 _cmp64i32
-           _cmp32i32 _cmp16i16 _cmc _clts _cli _cld _clc _cdqe _cdq _cbw
-           _call64pcrel32 _bswap64r _bswap32r _and8i8 _and64i32 _and32i32
-           _and16i16 _add8i8 _add64i32 _add32i32 _add16i16 _adc8i8 _adc64i32
-           _adc32i32 _adc16i16))
+ '(_xor8i8 _xor64i32 _xor32i32 _xor16i16 _xlat _xchg64ar _xchg32ar _xchg16ar _wrmsr _wbinvd _wait _trap _test8i8 _test64i32 _test32i32 _test16i16 _sysret64 _sysret _sysexit64 _sysexit _sysenter _syscall _sub8i8 _sub64i32 _sub32i32 _sub16i16 _stosw _stosq _stosl _stosb _sti _std _stc _scasw _scasq _scasl _scasb _sbb8i8 _sbb64i32 _sbb32i32 _sbb16i16 _sahf _rsm _reti64 _reti16 _ret64 _ret16 _rdtsc _rdpmc _rdmsr _pushgs64 _pushgs16 _pushfs64 _pushfs16 _pushf64 _pushf16 _push64r _push64i8 _push64i32 _push16r _push16i8 _push16i _popgs64 _popgs16 _popfs64 _popfs16 _popf64 _popf16 _pop64r _pop16r _pause _outsw _outsl _outsb _out8rr _out8ir _out32rr _out32ir _out16rr _out16ir _or8i8 _or64i32 _or32i32 _or16i16 _noop _movsw _movsq _movsl _movsb _mov8ri _mov8o64a _mov8o32a _mov8o16a _mov8ao64 _mov8ao32 _mov8ao16 _mov64ri _mov64o64a _mov64o32a _mov64ao64 _mov64ao32 _mov32ri _mov32o64a _mov32o32a _mov32o16a _mov32ao64 _mov32ao32 _mov32ao16 _mov16ri _mov16o64a _mov16o32a _mov16o16a _mov16ao64 _mov16ao32 _mov16ao16 _mmx_emms _lreti64 _lreti32 _lreti16 _lret64 _lret32 _lret16 _loopne _loope _loop _lodsw _lodsq _lodsl _lodsb _leave64 _lahf _jrcxz _jmp_1
+           _jecxz _iret64 _iret32 _iret16 _invd _int3 _int _insw _insl _insb _in8rr _in8ri _in32rr _in32ri _in16rr _in16ri _hlt _getsec _femms _enter _cwde _cwd _cqo _cpuid _cmpsw _cmpsq _cmpsl _cmpsb _cmp8i8 _cmp64i32 _cmp32i32 _cmp16i16 _cmc _clts _cli _cld _clc _cdqe _cdq _cbw _call64pcrel32 _bswap64r _bswap32r _and8i8 _and64i32 _and32i32 _and16i16 _add8i8 _add64i32 _add32i32 _add16i16 _adc8i8 _adc64i32 _adc32i32 _adc16i16))
