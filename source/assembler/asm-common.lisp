@@ -22,12 +22,21 @@
            :type (vector '(unsigned-byte 8)))))
 
 (defclass asm-context nil
-  ((mode :accessor mode-of :initarg :mode :type (member 16 32 64))
+  ((mode :accessor mode-of :initform 64 :initarg :mode :type (member 16 32 64))
    (buffer :initform
            (make-array 64 :element-type '(unsigned-byte 8) :adjustable t
                           :fill-pointer 0)
            :accessor buffer-of :initarg :buffer :type
            (vector '(unsigned-byte 8)))))
+
+(defun current-execution-mode ()
+  (mode-of *asm-context*))
+
+(define-instruction bits (bits)
+  (once-only (bits)
+    `(progn
+       (assert (member ,bits '(16 32 64)))
+       (setf (mode-of *asm-context*) ,bits))))
 
 (define-condition assembler-error
     (serious-condition)

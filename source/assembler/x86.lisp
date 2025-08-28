@@ -65,14 +65,68 @@
   (when bytes
     `((emit-bytes ',bytes))))
 
-(defun form/raw (name params prefix-bytes opcode-prefix-bytes opcode)
-  (let ((body `(,@(maybe-emit-bytes prefix-bytes)
-                ,@(maybe-emit-bytes opcode-prefix-bytes)
-                (emit-byte ',opcode))))
-    `(define-instruction ,name ,(mapcar 'car params)
-       ',(if (= 1 (length body))
-             (first body)
-             `(progn ,@body)))))
+(defun process-instr-arg (entry)
+  (let ((name (car entry))
+        (type (cdr entry)))
+    (acond
+      ((find type '((:gr8 8) (:gr16 16) (:gr32 32) (:gr64 64)) :key 'car :test 'eq)
+       (multiple-value-bind (reg-index reg-mode reg-extra-bit)
+           (register-name->encoding-bits name :expected-mode it)
+         (list :register reg-index reg-mode reg-extra-bit)))
+      ((find type '((:|i8imm| *) (:|i16imm| 16) (:|i32imm| 32) (:|i64imm| 64)) :key 'car :test 'eq)
+       (values :immediate it)))))
+
+(defun needs-operand-size-prefix? (op-size)
+  (or (and (eq op-size :|OpSize16|)
+           (not (eql (current-execution-mode) 16)))
+      (and (eq op-size :|OpSize32|)
+           (not (eql (current-execution-mode) 64)))))
+
+(defun emit-forms/imm (value bits)
+  `(progn
+     ,@(unless (zerop (logand value (lognot (1- (expt 2 bits)))))
+         (invalid-instruction-error "~S bit immediate operand ~A is out of range" bits value)
+         (values))
+     ,@(loop :for offset = 0 :then (+ offset 8)
+             :while (< offset bits)
+             :collect `(emit-byte (ldb (byte 8 ,offset) ,value)))))
+
+(defun form/raw (instr name params prefix-bytes opcode-prefix-bytes opcode)
+  (destructuring-bind (&key has-rex.w op-size
+                       &allow-other-keys)
+      instr
+    (let ((prefix-and-rex (append prefix-bytes
+                                  (when has-rex.w
+                                    (list (logior #x40 rex.w)))))
+          (opcode-part (append opcode-prefix-bytes
+                               (list opcode))))
+      `(define-instruction ,name ,(mapcar 'car params)
+         `(progn
+            (emit-bytes ',',prefix-and-rex)
+            (when (needs-operand-size-prefix? ',',op-size)
+              (emit-byte #x66))
+            (emit-bytes ',',opcode-part)
+            ;; emit immediates, if any
+            ;; TODO must use once-only for immediate macro args
+            ,@,(append '(list)
+                       (remove nil
+                               (mapcar (lambda (param)
+                                         (destructuring-bind (name . type) param
+                                           (case type
+                                             ((:|i8imm|
+                                               :|i16i8imm|
+                                               :|i32i8imm|
+                                               :|i64i8imm|)
+                                              `(emit-forms/imm ,name 8))
+                                             (:|i16imm|
+                                              `(emit-forms/imm ,name 16))
+                                             ((:|i32imm|
+                                               :|i64i32imm|)
+                                              `(emit-forms/imm ,name 32))
+                                             (:|i64imm| `(emit-forms/imm ,name 64))
+                                             ;; TODO
+                                             )))
+                                       params))))))))
 
 (defun form/add-reg (params prefix-bytes opcode-prefix-bytes opcode)
   `(multiple-value-bind (reg-index reg-mode reg-extra-bit)
@@ -94,6 +148,8 @@
         (emit-bytes ',',prefix-bytes)
         ,(when (eql reg-mode 64)
            ;; emit REX.W + the reg extra bit
-           `(emit-byte (logior #x48 ,(if reg-extra-bit ,rex.b 0))))
+           `(emit-byte ,(logior #x40
+                                rex.w
+                                (if reg-extra-bit ,rex.b 0))))
         (emit-bytes ',',opcode-prefix-bytes)
-        (emit-byte (logior ',',opcode ,reg-index)))))
+        (emit-byte ,(logior ',opcode reg-index)))))
