@@ -9,7 +9,8 @@
         :alexandria
         :anaphora
         :hu.dwim.genassem/asm-common
-        :hu.dwim.genassem/x86)
+        :hu.dwim.genassem/x86
+        :metabang-bind)
   (:local-nicknames
    (#:jzon :com.inuoe.jzon))
   (:export))
