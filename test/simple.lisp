@@ -59,8 +59,6 @@
 0000000A  90                nop
 ")
   ((bits 64)
-   (_bswap32r edx)
-   (_bswap64r r14)
    (_cmp8i8   #x12)
    (_cmp16i16 #x1122)
    (_cmp32i32 #x11223344)
@@ -75,22 +73,32 @@
    (_adc16i16 #xffff)
    (_adc32i32 #x44556677)
    (_adc32i32 #xffffffff)
+   "00000000  3C12              cmp al,0x12
+00000002  663D2211          cmp ax,0x1122
+00000006  3D44332211        cmp eax,0x11223344
+0000000B  483D44332211      cmp rax,0x11223344
+00000011  347F              xor al,0x7f
+00000013  66352211          xor ax,0x1122
+00000017  3544332211        xor eax,0x11223344
+0000001C  483544332211      xor rax,0x11223344
+00000022  1484              adc al,0x84
+00000024  14FF              adc al,0xff
+00000026  66157766          adc ax,0x6677
+0000002A  6615FFFF          adc ax,0xffff
+0000002E  1577665544        adc eax,0x44556677
+00000033  15FFFFFFFF        adc eax,0xffffffff
+")
+  ((bits 64)
+   (_bswap32r edx)
+   (_bswap64r rbx)
+   (_bswap64r r14)
    "00000000  0FCA              bswap edx
-00000002  490FCE            bswap r14
-00000005  3C12              cmp al,0x12
-00000007  663D2211          cmp ax,0x1122
-0000000B  3D44332211        cmp eax,0x11223344
-00000010  483D44332211      cmp rax,0x11223344
-00000016  347F              xor al,0x7f
-00000018  66352211          xor ax,0x1122
-0000001C  3544332211        xor eax,0x11223344
-00000021  483544332211      xor rax,0x11223344
-00000027  1484              adc al,0x84
-00000029  14FF              adc al,0xff
-0000002B  66157766          adc ax,0x6677
-0000002F  6615FFFF          adc ax,0xffff
-00000033  1577665544        adc eax,0x44556677
-00000038  15FFFFFFFF        adc eax,0xffffffff
+00000002  480FCB            bswap rbx
+00000005  490FCE            bswap r14
+")
+  ((bits 64)
+   (_enter #x1122 #xff)
+   "00000000  C82211FF          enter 0x1122,0xff
 ")))
 
 (deftest simple ()
@@ -106,9 +114,11 @@
 (defparameter *invalid-instructions*
   '((_bswap32r r14)
     (_bswap64r eax)
-    (_adc8i8 #x100)
-    (_adc16i16 #x10000)
-    (_adc32i32 #x100000000)
+    (_adc8i8 #x112)
+    (_adc16i16 #x112345678)
+    (_adc32i32 #x112345678)
+    (_enter #x11234 #x12)
+    (_enter #x1234 #x112)
     ))
 
 (deftest invalids ()

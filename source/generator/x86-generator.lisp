@@ -7,37 +7,34 @@
 (in-package :hu.dwim.genassem)
 
 (defun generate-x86-instruction-emitter (instr)
-  (destructuring-bind (&key name parameters ;mnemonic
-                         opcode op-map has-rex.w
-                         op-prefix      ;op-prefix/explicit
-                         form has-position-order
-                       &allow-other-keys)
-      instr
-    ;;(format *error-output* "~&; emitting ~S / ~S~%" name mnemonic)
-    (assert (<= opcode 255))
-    (assert has-position-order)
-    (labels
-        (
-         ;; (skip-instruction ()
-         ;;   (format *error-output* "; skipping ~S~%" name)
-         ;;   (return-from generate-x86-instruction-emitter))
-         )
-      (let ((lisp-name (intern/asm (concatenate 'string "_" name)))
-            (processed-params
-              (remove
-               nil
-               (mapcar (lambda (arg)
-                         (destructuring-bind (name . type)
-                             arg
-                           (assert (stringp name))
-                           (let ((type-name (symbol-name type)))
-                             (unless (or (starts-with-subseq "dstidx" type-name)
-                                         (starts-with-subseq "srcidx" type-name))
-                               (cons (intern/asm name)
-                                     type)))))
-                       parameters)))
-            (prefix-bytes ())
-            (opcode-prefix-bytes ()))
+  (catch 'cl:continue ; TODO delme or do this properly
+    (bind (((&key name parameters       ;mnemonic
+                  opcode op-map has-rex.w
+                  op-prefix             ;op-prefix/explicit
+                  form has-position-order
+                  &allow-other-keys) instr)
+           (lisp-name (intern/asm (concatenate 'string "_" name)))
+           (params
+            (remove
+             nil
+             (mapcar (lambda (param)
+                       (destructuring-bind (name . type)
+                           param
+                         (assert (stringp name))
+                         (let ((type-name (symbol-name type)))
+                           (unless (or (starts-with-subseq "dstidx" type-name)
+                                       (starts-with-subseq "srcidx" type-name))
+                             (cons (intern/asm name)
+                                   type)))))
+                     parameters)))
+           (prefix-bytes ())
+           (opcode-prefix-bytes ())
+           (rex (when has-rex.w
+                  (logior #x40 rex.w))))
+      ;;(format *error-output* "~&; emitting ~S / ~S~%" name mnemonic)
+      (assert (<= opcode 255))
+      (assert has-position-order)
+      (progn
         (ecase op-prefix
           ((nil)     ())
           (:pd       (push #x66 prefix-bytes))
@@ -56,23 +53,29 @@
           (ecase form
             (:raw
              ;; RawFrm specifically means raw form: the instruction has no special ModR/M or opcode map handling—it’s just a fixed sequence of bytes.
+             (emit-comment "raw, " name params)
              (emit-asm-form
               (form/raw instr
                         lisp-name
-                        processed-params
+                        params
+                        rex
                         (nreverse prefix-bytes)
                         (nreverse opcode-prefix-bytes)
                         opcode))
              lisp-name)
             (:add-reg
+             (emit-comment "add-reg, " name params)
              (emit-asm-form
-              `(define-instruction ,lisp-name ,(mapcar 'car processed-params)
-                 ,(form/add-reg processed-params
-                                (nreverse prefix-bytes)
-                                (nreverse opcode-prefix-bytes)
-                                opcode)))
+              (form/add-reg instr
+                            lisp-name
+                            params
+                            rex
+                            (nreverse prefix-bytes)
+                            (nreverse opcode-prefix-bytes)
+                            opcode))
              lisp-name)
             (:mrm
+             (emit-comment "mrm, " name params)
              ;; TODO
              )))))))
 

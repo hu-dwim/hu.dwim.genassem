@@ -33,4 +33,8 @@
    #:register-name->encoding-bits
    #:form/raw
    #:form/add-reg
+   #:rex.w
+   #:rex.r
+   #:rex.x
+   #:rex.b
    ))
