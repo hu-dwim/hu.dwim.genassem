@@ -59,13 +59,6 @@
                  `(setf (getf result ,name) ,value))
                (get-field (name)
                  `(getf result ,name)))
-      (let ((asm-string (asm-string obj)))
-        (when asm-string
-          (set-field :asm-string asm-string)
-          (set-field :mnemonic (aif (position #\Tab asm-string)
-                                    (subseq asm-string 0 it)
-                                    asm-string))))
-
       (set-field :name (json-value obj "!name"))
 
       (let* ((form-entry (json-value obj "Form"))
@@ -131,46 +124,67 @@
       ;; InOperandList/OutOperandList = visible, explicit operands.
       ;; Uses/Defs = implicit operands (hidden side effects: registers, flags, memory, ports).
       (labels
-          ((get-arg-list (json-key)
+          ((get-param-list (json-key)
              (let ((operands (json-value obj json-key)))
                (assert (equal "dag" (json-value operands "kind")))
                (json-value operands "args")))
-           (normalize-arg-list (args)
-             (loop :for arg :across args
-                   :for type = (elt arg 0)
-                   :for name = (elt arg 1)
+           (normalize-param-list (params)
+             (loop :for param :across params
+                   :for type = (elt param 0)
+                   :for name = (elt param 1)
                    :unless (eq 'null name)
                      :collect (cons name (json/def-like-as-keyword type)))))
-        (let ((output-args (normalize-arg-list (get-arg-list "OutOperandList")))
-              (input-args  (normalize-arg-list (get-arg-list "InOperandList"))))
+        (let ((output-params (normalize-param-list (get-param-list "OutOperandList")))
+              (input-params  (normalize-param-list (get-param-list "InOperandList"))))
+          ;; TODO
+          #+nil
           (when (string= (json-value obj "Constraints")
                          "$src = $dst")
-            (assert (string= "src" (car (first input-args))))
-            (assert (string= "dst" (car (first output-args))))
-            (pop output-args))
-          (set-field :parameters (append output-args input-args))))
+            (assert (string= "src" (car (first input-params))))
+            (assert (string= "dst" (car (first output-params))))
+            (pop output-params))
+          (set-field :inputs input-params)
+          (set-field :outputs output-params)))
 
-      ;; TODO delme
-      (let ((key (json-value obj "FormBits")
-                 ;;(get-field :form)
-                 #+nil(list
-                       ;;(get-field :mnemonic)
-                       (get-field :opcode)
-                       (get-field :op-map)
-                       (get-field :form)
-                       )))
-        (push result (gethash key *map*)))
-
+      (let ((asm-string (asm-string obj)))
+        (when asm-string
+          (set-field :asm-string asm-string)
+          (bind (((:values mnemonic params)
+                  (aif (position #\Tab asm-string)
+                       (values (subseq asm-string 0 it)
+                               (subseq asm-string (1+ it)))
+                       (values asm-string ""))))
+            (awhen (position #\{ mnemonic)
+              (let (;;(suffix (subseq mnemonic it))
+                    )
+                (setf mnemonic (subseq mnemonic 0 it))
+                ;; (assert (= 3 (length suffix)))
+                ;; (assert (member (elt suffix 1) '(#\b #\w #\l #\q #\s)))
+                ))
+            (set-field :mnemonic mnemonic)
+            (when (starts-with-subseq "{*}" params)
+              (setf params (subseq params 3)))
+            (awhen (position #\{ params)
+              (assert (zerop it))
+              (assert (eql #\} (elt params (1- (length params)))))
+              (let ((separator (position #\| params)))
+                (assert separator)
+                ;; here we chose the AT&T syntax
+                (setf params (subseq params 1 separator))))
+            (let* ((params (mapcar (lambda (el)
+                                     (string-trim '(#\Space) el))
+                                   (split-sequence:split-sequence
+                                    #\, params
+                                    :remove-empty-subseqs t)))
+                   (inputs  (get-field :inputs))
+                   (outputs (get-field :outputs))
+                   (all-params (append inputs outputs)))
+              (set-field :parameters
+                         (loop :for param :in params
+                               :when (eql #\$ (elt param 0))
+                                 :collect (or (assoc (subseq param 1) all-params :test 'equal)
+                                              (error "failed to look up param ~S" param))))))))
       result)))
-
-;; TODO delme
-(defparameter *map* (make-hash-table :test 'equal))
-
-;; (maphash (lambda (key value)
-;;            (format t "~%*** ~A~%      ~A~%"
-;;                    key (mapcar (lambda (instr) (getf instr :asm-string)) value)))
-;;          *map*)
-
 
 ;; (defparameter *supported-encodings* '("EncNormal"))
 
@@ -262,6 +276,9 @@
   (intern (string-upcase str)))
 
 (defun emit-asm-form (form)
-  (pprint form)
-  ;;(terpri)
-  (force-output))
+  (pprint form))
+
+(defun emit-comment (&rest parts)
+  (fresh-line)
+  (write-string ";; ")
+  (map nil 'princ parts))
