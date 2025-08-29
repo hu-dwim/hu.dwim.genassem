@@ -8,25 +8,12 @@
 
 (defun generate-x86-instruction-emitter (instr)
   (catch 'cl:continue ; TODO delme or do this properly
-    (bind (((&key name parameters       ;mnemonic
+    (bind (((&key name parameters form      ;mnemonic
                   opcode op-map has-rex.w
                   op-prefix             ;op-prefix/explicit
-                  form has-position-order
+                  form-category has-position-order
                   &allow-other-keys) instr)
            (lisp-name (intern/asm (concatenate 'string "_" name)))
-           (params
-            (remove
-             nil
-             (mapcar (lambda (param)
-                       (destructuring-bind (name . type)
-                           param
-                         (assert (stringp name))
-                         (let ((type-name (symbol-name type)))
-                           (unless (or (starts-with-subseq "dstidx" type-name)
-                                       (starts-with-subseq "srcidx" type-name))
-                             (cons (intern/asm name)
-                                   type)))))
-                     parameters)))
            (prefix-bytes ())
            (opcode-prefix-bytes ())
            (rex (when has-rex.w
@@ -34,6 +21,7 @@
       ;;(format *error-output* "~&; emitting ~S / ~S~%" name mnemonic)
       (assert (<= opcode 255))
       (assert has-position-order)
+      (emit-comment form " " name " " parameters)
       (progn
         (ecase op-prefix
           ((nil)     ())
@@ -50,32 +38,27 @@
           ;;   (break))
           ;; (when (starts-with-subseq "OUT" name)
           ;;   (break))
-          (ecase form
+          (ecase form-category
             (:raw
              ;; RawFrm specifically means raw form: the instruction has no special ModR/M or opcode map handling—it’s just a fixed sequence of bytes.
-             (emit-comment "raw, " name params)
              (emit-asm-form
               (form/raw instr
                         lisp-name
-                        params
                         rex
                         (nreverse prefix-bytes)
                         (nreverse opcode-prefix-bytes)
                         opcode))
              lisp-name)
             (:add-reg
-             (emit-comment "add-reg, " name params)
              (emit-asm-form
               (form/add-reg instr
                             lisp-name
-                            params
                             rex
                             (nreverse prefix-bytes)
                             (nreverse opcode-prefix-bytes)
                             opcode))
              lisp-name)
             (:mrm
-             (emit-comment "mrm, " name params)
              ;; TODO
              )))))))
 

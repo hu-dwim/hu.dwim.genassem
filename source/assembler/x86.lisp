@@ -98,22 +98,44 @@
              :while (< offset bits)
              :collect `(emit-byte (ldb (byte 8 ,offset) ,value)))))
 
-(defmacro map-params (params &body body)
+(defmacro map-params! ((params &key (single-match? nil)) &body body)
   "What the name suggests, except that it also consumes/removes the param from the list when body returns with non-nil."
   (with-unique-names (param)
-    `(loop :for ,param :in ,params
-           :for result = (destructuring-bind (-name- . -type-) ,param
-                           ,@body)
-           :if result
-             :collect result :into results
-           :else
-             :collect ,param :into new-params
-           :finally
-              (setf ,params new-params)
-              (return results))))
+    (once-only (single-match?)
+      `(loop :while (or (null results)
+                        (not ,single-match?))
+             :for ,param :in ,params
+             :for result = (destructuring-bind (-name- . -type-) ,param
+                             ,@body)
+             :if (and result
+                      (or (not ,single-match?)
+                          (null results)))
+               :collect result :into results
+             :else
+               :collect ,param :into new-params
+             :finally
+                (setf ,params new-params)
+                (return (if ,single-match?
+                            (first results)
+                            results))))))
 
-(defun form/raw (instr name params rex prefix-bytes opcode-prefix-bytes opcode)
-  (destructuring-bind (&key op-size
+(defun register-type? (type)
+  (ecase type
+    ((:gr8
+      :gr16
+      :gr32
+      :gr64)
+     t)
+    ((:|i8imm|
+      :|i16imm|
+      :|i32imm|
+      :|i64imm|))
+    #+nil
+    (otherwise
+     (print type *error-output*))))
+
+(defun form/raw (instr name rex prefix-bytes opcode-prefix-bytes opcode)
+  (destructuring-bind (&key form op-size parameters
                        &allow-other-keys)
       instr
     (let ((prefix-and-rex (append prefix-bytes
@@ -121,8 +143,10 @@
                                     (list rex))))
           (opcode-part (append opcode-prefix-bytes
                                (list opcode))))
+      (when (eq form :|RawFrmDstSrc|)
+        (setf parameters ()))
       (prog1
-          `(define-instruction ,name ,(mapcar 'car params)
+          `(define-instruction ,name ,(mapcar 'car parameters)
              ;; TODO add once-only wrapper for the macro args
              `(progn
                 (emit-bytes ',',prefix-and-rex)
@@ -132,13 +156,18 @@
                 ;; emit immediates, if any
                 ,@,(append
                     '(list)
-                    (map-params params
+                    (map-params! (parameters)
                       (case -type-
                         ((:|i8imm|
                           :|i16i8imm|
                           :|i32i8imm|
                           :|i64i8imm|
-                          :|brtarget8|)
+                          :|brtarget8|
+                          ;; TODO maybe this two should be deleted
+                          ;; same for the 16 32 and 64 versions below
+                          :|srcidx8|
+                          :|dstidx8|
+                          )
                          `(emit-forms/imm ,-name- 8))
                         ((:|offset16_8|
                           :|offset16_16|
@@ -155,40 +184,93 @@
                          (throw 'cl:continue nil))
                         (:|u8imm|
                          `(emit-forms/imm ,-name- 8 nil))
-                        (:|i16imm|
+                        ((:|i16imm|
+                          :|srcidx16|
+                          :|dstidx16|
+                          )
                          `(emit-forms/imm ,-name- 16))
                         ((:|i32imm|
                           :|i64i32imm|
-                          :|i64i32imm_brtarget|)
+                          :|srcidx32|
+                          :|dstidx32|
+                          :|i64i32imm_brtarget|
+                          )
                          `(emit-forms/imm ,-name- 32))
-                        (:|i64imm|
+                        ((:|i64imm|
+                          :|srcidx64|
+                          :|dstidx64|
+                          )
                          `(emit-forms/imm ,-name- 64)))))))
         ;; Make sure we have consumed all the params
-        (assert (null params))))))
+        (assert (null parameters))))))
 
-(defun form/add-reg (instr name params rex prefix-bytes opcode-prefix-bytes opcode)
-  (declare (ignore instr))
-  `(define-instruction ,name ,(mapcar 'car params)
-     (multiple-value-bind (reg-index reg-mode reg-extra-bit)
-         (register-name->encoding-bits
-          ,(car (first params))
-          :expected-mode ,(ecase (cdr (first params))
-                            (:gr8 8)
-                            (:gr16 16)
-                            (:gr32 32)
-                            (:gr64 64)
-                            ((:|i8imm|
-                              :|i16imm|
-                              :|i32imm|
-                              :|i64imm|
-                              )
-                             ;; TODO
-                             )))
-       `(progn
-          (emit-bytes ',',prefix-bytes)
-          ,(when (eql reg-mode 64)
-             ;; TODO how come rex is nil here for e.g. bswap32r?
-             `(emit-byte ,(logior ,(or rex (logior #x40 rex.w))
-                                  (if reg-extra-bit ,rex.b 0))))
-          (emit-bytes ',',opcode-prefix-bytes)
-          (emit-byte ,(logior ',opcode reg-index))))))
+(defun form/add-reg (instr name rex prefix-bytes opcode-prefix-bytes opcode)
+  (destructuring-bind (&key op-size     ; inputs outputs
+                         parameters &allow-other-keys)
+      instr
+    (let ((dst-param (map-params! (parameters :single-match? t)
+                       (when (register-type? -type-)
+                         (cons -name- -type-)))))
+      (assert dst-param)
+      (prog1
+          `(define-instruction ,name ,(mapcar 'car (getf instr :parameters))
+             (multiple-value-bind (reg-index reg-mode reg-extra-bit)
+                 (register-name->encoding-bits
+                  ,(car dst-param)
+                  :expected-mode ,(ecase (cdr dst-param)
+                                    (:gr8 8)
+                                    (:gr16 16)
+                                    (:gr32 32)
+                                    (:gr64 64)
+                                    ((:|i8imm|
+                                      :|i16imm|
+                                      :|i32imm|
+                                      :|i64imm|
+                                      )
+                                     ;; TODO
+                                     )))
+               `(progn
+                  (emit-bytes ',',prefix-bytes)
+                  ,(when (eql reg-mode 64)
+                     ;; TODO how come rex is nil here for e.g. bswap32r?
+                     `(emit-byte ,(logior ,(or rex (logior #x40 rex.w))
+                                          (if reg-extra-bit ,rex.b 0))))
+                  (when (needs-operand-size-prefix? ',',op-size)
+                    (emit-byte #x66))
+                  (emit-bytes ',',opcode-prefix-bytes)
+                  (emit-byte ,(logior ',opcode reg-index))
+                  ;; TODO copy-paste from above
+                  ,@,(append
+                      '(list)
+                      (map-params! (parameters)
+                        (case -type-
+                          ((:|i8imm|
+                            :|i16i8imm|
+                            :|i32i8imm|
+                            :|i64i8imm|
+                            :|brtarget8|)
+                           `(emit-forms/imm ,-name- 8))
+                          ((:|offset16_8|
+                            :|offset16_16|
+                            :|offset16_32|
+                            :|offset32_8|
+                            :|offset32_16|
+                            :|offset32_32|
+                            :|offset32_64|
+                            :|offset64_8|
+                            :|offset64_16|
+                            :|offset64_32|
+                            :|offset64_64|)
+                           ;; TODO
+                           (throw 'cl:continue nil))
+                          (:|u8imm|
+                           `(emit-forms/imm ,-name- 8 nil))
+                          (:|i16imm|
+                           `(emit-forms/imm ,-name- 16))
+                          ((:|i32imm|
+                            :|i64i32imm|
+                            :|i64i32imm_brtarget|)
+                           `(emit-forms/imm ,-name- 32))
+                          (:|i64imm|
+                           `(emit-forms/imm ,-name- 64))))))))
+        (assert (null parameters))))))
