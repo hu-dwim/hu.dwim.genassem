@@ -20,7 +20,9 @@
                :anaphora
                :hu.dwim.genassem/asm-common
                :com.inuoe.jzon
-               :uiop)
+               :uiop
+               :metabang-bind
+               :split-sequence)
   :components ((:module "source"
                 :components
                 ((:module "generator"
