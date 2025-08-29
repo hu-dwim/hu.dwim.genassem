@@ -63,8 +63,9 @@
 
       (let* ((form-entry (json-value obj "Form"))
              (form-value (json-value form-entry "def")))
+        (set-field :form (intern form-value :keyword))
         (set-field
-         :form
+         :form-category
          (cond
            ((starts-with-subseq "RawFrm" form-value)
             :raw)
@@ -118,7 +119,7 @@
           (set-field :op-prefix/explicit value)))
 
 ;;;
-;;; args
+;;; params
 ;;;
 
       ;; InOperandList/OutOperandList = visible, explicit operands.
@@ -133,7 +134,8 @@
                    :for type = (elt param 0)
                    :for name = (elt param 1)
                    :unless (eq 'null name)
-                     :collect (cons name (json/def-like-as-keyword type)))))
+                     :collect (cons (intern/asm name)
+                                    (json/def-like-as-keyword type)))))
         (let ((output-params (normalize-param-list (get-param-list "OutOperandList")))
               (input-params  (normalize-param-list (get-param-list "InOperandList"))))
           ;; TODO
@@ -182,7 +184,8 @@
               (set-field :parameters
                          (loop :for param :in params
                                :when (eql #\$ (elt param 0))
-                                 :collect (or (assoc (subseq param 1) all-params :test 'equal)
+                                 :collect (or (assoc (string-upcase (subseq param 1))
+                                                     all-params :test 'string=)
                                               (error "failed to look up param ~S" param))))))))
       result)))
 

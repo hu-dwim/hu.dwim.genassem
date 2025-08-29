@@ -98,8 +98,21 @@
 ")
   ((bits 64)
    (_enter #x1122 #xff)
+   (_mov16ri #x1122 bx)
    "00000000  C82211FF          enter 0x1122,0xff
-")))
+00000004  66BB2211          mov bx,0x1122
+")
+  ((bits 64)
+   (_cmpsb)
+   (_cmpsl)
+   (_cmpsq)
+   (_cmpsw)
+   "00000000  A6                cmpsb
+00000001  A7                cmpsd
+00000002  48A7              cmpsq
+00000004  66A7              cmpsw
+")
+  ))
 
 (deftest simple ()
   (loop :for entry :in *simple-tests*
