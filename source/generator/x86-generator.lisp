@@ -123,10 +123,6 @@
                           :|i32i8imm|
                           :|i64i8imm|
                           :|brtarget8|
-                          ;; TODO maybe this two should be deleted
-                          ;; same for the 16 32 and 64 versions below
-                          :|srcidx8|
-                          :|dstidx8|
                           )
                          `(emit-forms/imm ,-name- 8))
                         ((:|offset16_8|
@@ -146,20 +142,14 @@
                         (:|u8imm|
                          `(emit-forms/imm ,-name- 8 nil))
                         ((:|i16imm|
-                          :|srcidx16|
-                          :|dstidx16|
                           )
                          `(emit-forms/imm ,-name- 16))
                         ((:|i32imm|
                           :|i64i32imm|
-                          :|srcidx32|
-                          :|dstidx32|
                           :|i64i32imm_brtarget|
                           )
                          `(emit-forms/imm ,-name- 32))
                         ((:|i64imm|
-                          :|srcidx64|
-                          :|dstidx64|
                           )
                          `(emit-forms/imm ,-name- 64)))))))
         ;; Make sure we have consumed all the immediates
@@ -298,7 +288,6 @@
    (pprint-dispatch '(defun x (y)))))
 
 (defun generate-assembler/x86_64 (&key
-                                    (print-source? nil)
                                     (package :hu.dwim.genassem/x86))
   (unless (packagep package)
     (setf package (find-package package)))
@@ -362,8 +351,6 @@
                      (progn
                        (write-char #\. *error-output*)
                        (incf emit-counter)
-                       (when print-source?
-                         (print obj))
                        (push (generate-x86-instruction-emitter obj)
                              symbols-to-export))
                      (write-char #\x *error-output*))))))

@@ -26,7 +26,9 @@
 
 (defun pseudo-instruction? (obj)
   (or (json/true-value? obj "isPseudo")
-      (json/true-value? obj "isCodeGenOnly")))
+      (json/true-value? obj "isCodeGenOnly")
+      (json/true-value? obj "isAsmParserOnly")
+      ))
 
 (defun asm-string (obj)
   (let ((value (json-value obj "AsmString")))
@@ -191,12 +193,12 @@
                    (inputs  (get-field :inputs))
                    (outputs (get-field :outputs))
                    (all-params (append inputs outputs))
+                   (sae? nil)
                    (filtered-params
                      (mapcar (lambda (param)
                                (let ((postfix nil)
-                                     (broadcast nil)
-                                     (sae nil))
-                                 (declare (ignorable postfix broadcast sae))
+                                     (broadcast? nil))
+                                 (declare (ignorable postfix broadcast?))
                                  (cond
                                    ((eql #\$ (elt param 0))
                                     (acond
@@ -204,7 +206,7 @@
                                             (eql #\} (elt param (1- (length param))))
                                             (position #\} param))
                                        ;; "${src2}{1to8}"
-                                       (setf broadcast (subseq param it))
+                                       (setf broadcast? (subseq param it))
                                        (setf param (subseq param 2 it)))
                                       ((position #\Space param)
                                        ;; "$dst {${mask}}"
@@ -214,7 +216,11 @@
                                                     (subseq param 0 it))))
                                       (t
                                        (setf param (subseq param 1))))
-                                    ;; TODO parse and represent postfix and broadcast
+                                    (when (equal param "zero")
+                                      ;; this is for stuff like the
+                                      ;; fake nops, like xchg %ax, %ax
+                                      (assert (starts-with-subseq "nop" asm-string))
+                                      (return-from normalize-instruction nil))
                                     (or (assoc (string-upcase param)
                                                all-params :test 'string=)
                                         (cerror "ignore" "failed to look up param ~S" param)))
@@ -222,12 +228,14 @@
                                     ;; it's some implicit register, we ignore those
                                     nil)
                                    ((equal param "{sae}")
-                                    (setf sae t)
-                                    (setf param nil))
+                                    (setf sae? t)
+                                    nil)
                                    (t
                                     (cerror "Ignore" "TODO: Unrecognized pattern, param is: ~S" param)
                                     nil))))
                              params)))
+              (declare (ignorable sae?))
+              ;; TODO represent sae? broadcast? and process the postfix
               (set-field :parameters (remove nil filtered-params))))))
       result)))
 
@@ -249,7 +257,7 @@
   (declare (ignore obj))
   t)
 
-(defun process-tablegen-json (stream instruction-emitter)
+(defun process-tablegen-json (stream visitor &key (normalize? t))
   (jzon:with-parser (parser stream)
     (let ((depth 0)
           top
@@ -303,11 +311,14 @@
                               :do (setf (gethash name instr-names) t))))
                      ((and (gethash key instr-names)
                            (json/include-instruction? obj))
-                      (let ((instr (normalize-instruction obj)))
-                        (when (include-instruction? instr)
-                          (assert (equal "X86" (json-value obj "Namespace")))
-                          ;; (format *error-output* "~&; calling emitter for ~S~%" (getf instr :mnemonic))
-                          (funcall instruction-emitter instr))))))
+                      (if normalize?
+                          (let ((instr (normalize-instruction obj)))
+                            (when (and instr
+                                       (include-instruction? instr))
+                              (assert (equal "X86" (json-value obj "Namespace")))
+                              ;; (format *error-output* "~&; calling emitter for ~S~%" (getf instr :mnemonic))
+                              (funcall visitor instr)))
+                          (funcall visitor obj)))))
                  (finish-value obj)))
 
               (:object-key

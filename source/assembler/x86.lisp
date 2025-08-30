@@ -24,6 +24,7 @@
           (error "Unexpected register name: ~S" name))))
 
 (defun register-name->encoding-bits (name &key expected-mode)
+  "Returns (values reg-index reg-mode reg-extra-bit)."
   (declare (optimize (debug 3))
            (type symbol name))
   (flet ((illegal-register ()
@@ -48,7 +49,7 @@
                         (unless (<= 8 index 15)
                           (invalid-instruction-error
                            "Invalid register name: ~S" name))
-                        index)
+                        (logand #b111 index))
                       64 1)))
         (#\E
          (when (and expected-mode
