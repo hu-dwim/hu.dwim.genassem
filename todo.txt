@@ -6,6 +6,24 @@
 what are these? skip them?
 
 we already skip isPseudo and where Opcode is zero
+** negative immediates?
+is the current code ok?
+
+find out how to properly deal with negative numbers in immediates (see
+EMIT-FORMS/IMM)
+
+#+nil(< (- (1- (expt 2 15)))
+        value
+        (expt 2 16))
+** keep or eliminate the (bits 32) pseudo instruction?
+if we get rid of the ability to switch the mode at emission time, then
+we could move the 66h prefix decision to macroexpand-time.
+
+but maybe this is needed (and nasm & co. does it like this) when e.g.
+writing code that switches execution mode...?
+
+must use a symbol-macrolet and access it through macroexpand-1 on the
+&environment to retrieve it.
 * knowledge base
 ** x86
 https://www.felixcloutier.com/x86/nop
@@ -61,7 +79,7 @@ Emit this when using 64-bit operands or registers R8–R15.
 
 REX:  0 1 0 0 W R X B (0x4_)
 W changes the operand size to 64 bits
-R expands reg to 4 bits
+R extra 4th bit of reg
 B expands r/m (or opreg in the few opcodes that encode the register in the 3 lowest opcode bits, such as "POP reg")
 X and B expand index and base in the SIB byte
 
@@ -84,6 +102,9 @@ e.g.:
 [RIP + offset] → 32-bit displacement in 64-bit mode
 **** Immediate
 1-8 bytes
+
+So *InOperandList* tells you what kind of thing goes there,
+  *ImmT* tells you how many bytes and with what rules to actually emit.
 **** The VEX prefix (x86-64-v3)
 replaces the most commonly used instruction prefix bytes and escape bytes.
 https://en.wikipedia.org/wiki/VEX_prefix
@@ -163,7 +184,82 @@ This would let you keep a single assembler rule for bswap, push, etc.
 *** json
 https://llvm.org/docs/TableGen/BackEnds.html#json-reference
 https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/X86/MCTargetDesc/X86MCCodeEmitter.cpp
-**** FormBits
+**** *InOperandList* and *OutOperandList* order
+LLVM’s InOperandList isn’t just a bag of inputs: its position in the
+list tells the encoder which slot of the instruction encoding this
+operand occupies. Each slot corresponds to a different machine-code
+field (ModR/M, immediate, displacement, prefix bits, …).
+
+1. Parse operands based on AsmString, not by concatenating lists.
+ - Use the $operandName placeholders in AsmString to decide which operands are explicit.
+ - Match $operandName back to entries in InOperandList or OutOperandList.
+
+2. Implicit outs (like EFLAGS, implicit registers) → ignore them in parsing, but keep them in metadata if you want to support analysis later.
+
+3. Explicit outs (like $dst in imul) → treat them as user-supplied operands, even though they live in OutOperandList.
+
+OutOperandList = what instruction defines.
+InOperandList = what instruction uses.
+AsmString = the true key telling you which operands actually show up in assembly text.
+
+For assembling, you follow AsmString. For encoding, you look up operand info by name.
+**** AsmString
+imul{w}: mnemonic, possibly with suffixes.
+
+    {w} means “word size” → in AT&T syntax, w indicates 16-bit.
+
+    The braces are substitution markers for things like {b}, {w}, {l}, {q}, depending on operand size.
+
+\t: literal tab character for spacing.
+
+{ ... | ... }: this is where Intel vs AT&T dialects differ.
+
+    Left side of | = AT&T syntax.
+
+    Right side of | = Intel syntax.
+
+
+{$src2, $src1, $dst | $dst, $src1, $src2}
+Operands are referenced by name, e.g. $src1, $src2, $dst.
+ - These names come from InOperandList and OutOperandList.
+
+Order matters:
+ - AT&T syntax → $src2, $src1, $dst
+ - Intel syntax → $dst, $src1, $src2
+
+This matches the conventions of each dialect:
+ - AT&T: destination is last.
+ - Intel: destination is first.
+
+***** DONE corner cases to deal with
+****** {${mask}}{z}
+"v4fmaddps	{$src3, $src2, $dst {${mask}}|$dst {${mask}}, $src2, $src3}"
+"v4fmaddps	{$src3, $src2, $dst {${mask}} {z}|$dst {${mask}} {z}, $src2, $src3}"
+${mask} is an optional mask register (k0–k7).
+{z} optional keyword when the instruction supports the “zeroing” feature.
+****** {1to8}
+"vaddbf16	{${src2}{1to8}, $src1, $dst {${mask}} {z}|$dst {${mask}} {z}, $src1, ${src2}{1to8}}"
+${src2}{1to8} → broadcast form of a memory operand
+  - Meaning: take a scalar memory element and replicate (broadcast) it across all lanes of the destination vector.
+{1to16}
+{1to32}
+(vaddbf16 dst src1 (broadcast src2 :factor 8) &optional mask zeroing?)
+encoding:
+ broadcast → encoded in EVEX.b + SAE bits, etc.
+ mask → EVEX.aaa
+ zeroing → EVEX.Z
+
+hints in json, operand types:
+ src2 of type bcst / i16mem_bcst / f32mem_bcst etc.
+ i16mem (normal memory)
+ i16mem_bcst (broadcast-capable memory)
+ That _bcst suffix is the canonical hint that the operand can accept {1toN}.
+****** {sae}
+"vcmppd	{$cc, {sae}, $src2, $src1, $dst|$dst, $src1, $src2, {sae}, $cc}"
+
+In TableGen, {sae} comes from special AsmOperandClass (like SAE or EVEX_SAE)
+It’s basically a flag → if present, set an EVEX bit (EVEX.b = 1) in the final encoding.
+**** FormBits and form
 is a bitmask representing properties of the instruction’s operand layout.
 
 https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/X86/X86InstrFormats.td
@@ -194,6 +290,38 @@ enum {
   // ... followed by MRM_C0..MRM_FF for hex opcode forms 64..126 etc.
 };
 
+***** decoding table
+RawFrm family (implied / fixed operands)
+| Form              | Example Mnemonics                     | Meaning for assembler generator                        | What to do with JSON operands |
+| ----------------- | ------------------------------------- | ------------------------------------------------------ | ----------------------------- |
+| **RawFrm**        | `nop`, `clc`, `cbw`, `cdq`            | Pure opcode, no operands.                              | Ignore `$src`/`$dst`.         |
+| **RawFrmImm8**    | `int imm8`, `enter imm16, imm8`       | Has 8-bit immediate.                                   | Keep `i8imm`.                 |
+| **RawFrmImm16**   | `enter imm16, imm8` (imm16 part)      | Has 16-bit immediate.                                  | Keep `i16imm`.                |
+| **RawFrmImm32**   | Far `call imm32`, `jmp imm32`         | Has 32-bit immediate.                                  | Keep `i32imm`.                |
+| **RawFrmDstSrc**  | `cmpsb/w/d/q`, `movsb/w/d/q`          | No explicit operands: implicit `(E)SI→(E)DI`.          | Ignore `$src`/`$dst`.         |
+| **RawFrmDst**     | `stosb/w/d/q`, `scasb/w/d/q`          | No explicit operands: implicit `AL/AX/EAX` → `[EDI]`.  | Ignore `$dst`.                |
+| **RawFrmSrc**     | `lodsb/w/d/q`                         | No explicit operands: implicit `[ESI]` → `AL/AX/EAX`.  | Ignore `$src`.                |
+| **RawFrmMemOffs** | `mov al, [imm32]`, `mov [imm32], eax` | Memory is encoded as absolute displacement, no ModR/M. | Keep `offset32`.              |
+
+
+MRM family (special ModR/M encodings; the instruction is distinguished by the ModR/M reg field (bits 3–5), not by opcode alone.)
+| Form              | Example Mnemonics            | Meaning                                                      | Assembler generator action                                              |
+| ----------------- | ---------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| **MRM0r–MRM7r**   | `TEST r/m32, r32` variants   | The `/r` field in ModR/M is used as opcode extension 0–7.    | JSON already expands them. Treat like normal ModR/M form.               |
+| **MRM0m–MRM7m**   | `TEST r/m8, imm8` (etc.)     | Same as above, but operand is memory.                        | Normal ModR/M handling.                                                 |
+| **MRM\_C0**       | `xlat`, some `FPU` ops       | Fixed reg field = `000b`. No explicit operand.               | Assembler should expose zero operands.                                  |
+| **MRM\_0F**       | All `0F xx` two-byte opcodes | Means this opcode uses `0F` escape prefix.                   | Treat normally; JSON gives operands.                                    |
+| **MRM\_C1, C2 …** | Many FPU instructions        | Opcode group distinguished by ModR/M reg field = 001b, 010b… | Usually no operands (implicit ST registers). Ignore JSON `$src`/`$dst`. |
+
+
+others:
+| Form                 | Example Mnemonics                        | Meaning                                                        | Assembler action                                      |
+| -------------------- | ---------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------- |
+| **MRM\_C8 … CF**     | FPU register stack ops like `fxch st(i)` | Operands encoded in ModR/M reg field, but always ST registers. | Sometimes JSON shows `dstidx8/srcidx8`. Map to ST(i). |
+| **MRM\_Int**         | `INT imm8`                               | Encoded with opcode `CD` + imm8.                               | Same as RawFrmImm8 (alias).                           |
+| **MRM\_SI/DI**       | `MOVS`, `CMPS`, etc.                     | Implied source/dest pointers (string ops).                     | Same as RawFrmDst/Src.                                |
+| **MRM\_Op3A, Op3B…** | `0F 3A xx`, `0F 3B xx`                   | Extra opcode map (VEX/SSSE3 instructions).                     | Normal operand handling; prefix distinguishes them.   |
+***** etc
 1. Raw Forms (no ModR/M):
    RawFrm, RawFrmMemOffs, RawFrmSrc, RawFrmDst, RawFrmDstSrc, RawFrmImm8, RawFrmImm16: used for immediate forms or memory offsets without ModR/M.
 

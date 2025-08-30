@@ -61,21 +61,6 @@
 (define-constant rex.x #x02)
 (define-constant rex.b #x01)
 
-(defun maybe-emit-bytes (bytes)
-  (when bytes
-    `((emit-bytes ',bytes))))
-
-(defun process-instr-arg (entry)
-  (let ((name (car entry))
-        (type (cdr entry)))
-    (acond
-      ((find type '((:gr8 8) (:gr16 16) (:gr32 32) (:gr64 64)) :key 'car :test 'eq)
-       (multiple-value-bind (reg-index reg-mode reg-extra-bit)
-           (register-name->encoding-bits name :expected-mode it)
-         (list :register reg-index reg-mode reg-extra-bit)))
-      ((find type '((:|i8imm| *) (:|i16imm| 16) (:|i32imm| 32) (:|i64imm| 64)) :key 'car :test 'eq)
-       (values :immediate it)))))
-
 (defun needs-operand-size-prefix? (op-size)
   (or (and (eq op-size :|OpSize16|)
            (not (eql (current-execution-mode) 16)))
@@ -230,7 +215,7 @@
                           :|dstidx64|
                           )
                          `(emit-forms/imm ,-name- 64)))))))
-        ;; Make sure we have consumed all the params
+        ;; Make sure we have consumed all the immediates
         (assert (null parameters))))))
 
 (defun form/add-reg (instr name rex prefix-bytes opcode-prefix-bytes opcode)
