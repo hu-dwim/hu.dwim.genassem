@@ -52,6 +52,16 @@
                   (0 (values)))))
     result))
 
+(defun drop-substitution-syntax (str)
+  (assert (eql #\$ (elt str 0)))
+  (let ((start 1)
+        (end (length str)))
+    (when (eql #\{ (elt str 1))
+      (assert (eql #\} (elt str (1- end))))
+      (incf start)
+      (decf end))
+    (subseq str start end)))
+
 (defun normalize-instruction (obj)
   (assert (equal "" (json-value obj "TwoOperandAliasConstraint")))
   (let ((result ()))
@@ -180,13 +190,45 @@
                                     :remove-empty-subseqs t)))
                    (inputs  (get-field :inputs))
                    (outputs (get-field :outputs))
-                   (all-params (append inputs outputs)))
-              (set-field :parameters
-                         (loop :for param :in params
-                               :when (eql #\$ (elt param 0))
-                                 :collect (or (assoc (string-upcase (subseq param 1))
-                                                     all-params :test 'string=)
-                                              (error "failed to look up param ~S" param))))))))
+                   (all-params (append inputs outputs))
+                   (filtered-params
+                     (mapcar (lambda (param)
+                               (let ((postfix nil)
+                                     (broadcast nil)
+                                     (sae nil))
+                                 (declare (ignorable postfix broadcast sae))
+                                 (cond
+                                   ((eql #\$ (elt param 0))
+                                    (acond
+                                      ((and (eql #\{ (elt param 1))
+                                            (eql #\} (elt param (1- (length param))))
+                                            (position #\} param))
+                                       ;; "${src2}{1to8}"
+                                       (setf broadcast (subseq param it))
+                                       (setf param (subseq param 2 it)))
+                                      ((position #\Space param)
+                                       ;; "$dst {${mask}}"
+                                       ;; "${dst} {${mask}}"
+                                       (setf postfix (subseq param it))
+                                       (setf param (drop-substitution-syntax
+                                                    (subseq param 0 it))))
+                                      (t
+                                       (setf param (subseq param 1))))
+                                    ;; TODO parse and represent postfix and broadcast
+                                    (or (assoc (string-upcase param)
+                                               all-params :test 'string=)
+                                        (cerror "ignore" "failed to look up param ~S" param)))
+                                   ((eql #\% (elt param 0))
+                                    ;; it's some implicit register, we ignore those
+                                    nil)
+                                   ((equal param "{sae}")
+                                    (setf sae t)
+                                    (setf param nil))
+                                   (t
+                                    (cerror "Ignore" "TODO: Unrecognized pattern, param is: ~S" param)
+                                    nil))))
+                             params)))
+              (set-field :parameters (remove nil filtered-params))))))
       result)))
 
 ;; (defparameter *supported-encodings* '("EncNormal"))
