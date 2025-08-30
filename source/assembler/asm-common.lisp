@@ -56,9 +56,9 @@
   ((instruction :accessor instruction-of :initarg :instruction)))
 
 (defun invalid-instruction-error (&optional format &rest args)
-  (check-type *current-instruction* list)
   (signal 'invalid-instruction-error
-          :instruction *current-instruction*
+          :instruction (when (boundp '*current-instruction*)
+                         *current-instruction*)
           :format-control format
           :format-arguments args))
 
