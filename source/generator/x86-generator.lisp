@@ -349,8 +349,8 @@
               (emit-counter 0)
               (symbols-to-export ()))
           (with-open-file (jstream (asdf:system-relative-pathname
-                               :hu.dwim.genassem
-                               "x86.json"))
+                                    :hu.dwim.genassem
+                                    "tablegen/x86-20.1.8.json"))
             (process-tablegen-json
              jstream
              (lambda (obj)

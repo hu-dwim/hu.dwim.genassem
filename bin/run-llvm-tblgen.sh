@@ -14,16 +14,35 @@
 #
 # WARNING: the versions of the tablegen exe and the .tb files must match!
 
+SCRIPT_DIR=$(dirname "$0")
+OUTPUT_DIR=$(readlink -f ${SCRIPT_DIR}/../tablegen/)
+
+echo "Saving TableGen json output to ${OUTPUT_DIR}"
+
+mkdir ${OUTPUT_DIR}
+
 LLVM=$(guix build llvm | sed -n '2p')
 LLVM_SRC=$(guix build --source llvm)
+LLVM_VERSION=$(guix package --show=llvm | recsel --print-values=version | head -1)
 
-${LLVM}/bin/llvm-tblgen -I=${LLVM_SRC}/llvm/include/ -I${LLVM_SRC}/llvm/lib/Target/X86/ ${LLVM_SRC}/llvm/lib/Target/X86/X86.td --dump-json >x86.json
+echo "LLVM version is ${LLVM_VERSION}"
+
+SUFFIX=-${LLVM_VERSION}
+
+echo "x86..."
+${LLVM}/bin/llvm-tblgen -I=${LLVM_SRC}/llvm/include/ -I${LLVM_SRC}/llvm/lib/Target/X86/ ${LLVM_SRC}/llvm/lib/Target/X86/X86.td --dump-json >${OUTPUT_DIR}/x86${SUFFIX}.json
+echo "arm..."
+${LLVM}/bin/llvm-tblgen -I=${LLVM_SRC}/llvm/include/ -I${LLVM_SRC}/llvm/lib/Target/ARM/ ${LLVM_SRC}/llvm/lib/Target/ARM/ARM.td --dump-json >${OUTPUT_DIR}/arm${SUFFIX}.json
 
 # pretty print it
-# guix shell jq -- jq --tab <x86.json >x86-pretty.json
+echo "Pretty printing them..."
+guix shell jq -- jq --tab <${OUTPUT_DIR}/x86${SUFFIX}.json >${OUTPUT_DIR}/x86${SUFFIX}-pretty.json
+guix shell jq -- jq --tab <${OUTPUT_DIR}/arm${SUFFIX}.json >${OUTPUT_DIR}/arm${SUFFIX}-pretty.json
 
 # list of instruction names
 # jq '.["!instanceof"]["X86Inst"]' x86.json
 
 # full instruction entries (it's 90+% of the space)
 # jq '[ .["!instanceof"]["X86Inst"][] as $name | {($name): .[$name]} ]' x86.json
+
+echo "Done."
