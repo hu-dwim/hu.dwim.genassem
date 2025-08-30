@@ -13,4 +13,21 @@
         :metabang-bind)
   (:local-nicknames
    (#:jzon :com.inuoe.jzon))
-  (:export))
+  (:export
+   #:intern/asm
+   #:emit-comment
+   #:emit-asm-form
+   #:process-tablegen-json
+   ))
+
+(uiop:define-package :hu.dwim.genassem/x86-generator
+  (:use :common-lisp
+        :alexandria
+        :anaphora
+        :hu.dwim.genassem
+        :hu.dwim.genassem/asm-common
+        :hu.dwim.genassem/x86
+        :metabang-bind)
+  (:export
+   #:generate-assembler/x86_64
+   ))
