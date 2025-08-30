@@ -120,19 +120,35 @@
                             results))))))
 
 (defun register-type? (type)
-  (ecase type
-    ((:gr8
-      :gr16
-      :gr32
-      :gr64)
-     t)
-    ((:|i8imm|
-      :|i16imm|
-      :|i32imm|
-      :|i64imm|))
-    #+nil
-    (otherwise
-     (print type *error-output*))))
+  ;; TODO not using an ecase here is fragile...
+  (member type
+          '(:gr8
+            :gr16
+            :gr32
+            :gr64)
+          :test 'eq))
+
+(defun immediate-type? (type)
+  ;; TODO not using an ecase here is fragile...
+  (member type
+          '(:|i64imm|
+            :|i32imm|
+            :|i16imm|
+            :|i8imm|
+            :|u8imm|
+            :|u4imm|
+            :|i32imm_brtarget|
+            :|i16imm_brtarget|
+            :|i64i32imm_brtarget|
+            :|i64i8imm|
+            :|i64u8imm|
+            :|i32u8imm|
+            :|i32i8imm|
+            :|i16u8imm|
+            :|i16i8imm|
+            :|i64i32imm|
+            )
+          :test 'eq))
 
 (defun form/raw (instr name rex prefix-bytes opcode-prefix-bytes opcode)
   (destructuring-bind (&key form op-size parameters
@@ -142,9 +158,21 @@
                                   (when rex
                                     (list rex))))
           (opcode-part (append opcode-prefix-bytes
-                               (list opcode))))
-      (when (eq form :|RawFrmDstSrc|)
-        (setf parameters ()))
+                               (list opcode)))
+          ;; All raw forms share that register operands are implicit.
+          (parameters parameters))
+      (ecase form
+        ((:|RawFrmDstSrc|
+          :|RawFrmDst|
+          :|RawFrmSrc|)
+         (setf parameters ()))
+        ((:|RawFrm|
+          :|RawFrmImm8|
+          :|RawFrmImm16|
+          :|RawFrmImm32|
+          :|RawFrmMemOffs|)
+         ;; nop; just to error for unexpected values
+         ))
       (prog1
           `(define-instruction ,name ,(mapcar 'car parameters)
              ;; TODO add once-only wrapper for the macro args
@@ -180,8 +208,9 @@
                           :|offset64_16|
                           :|offset64_32|
                           :|offset64_64|)
-                         ;; TODO
-                         (throw 'cl:continue nil))
+                         ;; these are de facto obsolete, let's just skip them...
+                         ;; FIXME introduce an API for this
+                         (throw :skip-instruction nil))
                         (:|u8imm|
                          `(emit-forms/imm ,-name- 8 nil))
                         ((:|i16imm|
@@ -261,8 +290,8 @@
                             :|offset64_16|
                             :|offset64_32|
                             :|offset64_64|)
-                           ;; TODO
-                           (throw 'cl:continue nil))
+                           ;; FIXME introduce an API for this
+                           (throw :skip-instruction nil))
                           (:|u8imm|
                            `(emit-forms/imm ,-name- 8 nil))
                           (:|i16imm|
