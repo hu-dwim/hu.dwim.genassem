@@ -62,8 +62,11 @@
 (define-constant rex.b #x01)
 
 (defun needs-operand-size-prefix? (op-size)
-  (and (eq op-size :|OpSize16|)
-       (not (eql (current-execution-mode) 16))))
+  (eq op-size :|OpSize16|))
+
+(defun maybe-emit-operand-size-prefix ()
+  (when (not (eql (current-execution-mode) 16))
+    (emit-byte #x66)))
 
 (defun emit-forms/imm (value bits &optional (signed? t))
   `(progn
@@ -161,8 +164,8 @@
              ;; TODO add once-only wrapper for the macro args
              `(progn
                 (emit-bytes ',',prefix-and-rex)
-                (when (needs-operand-size-prefix? ',',op-size)
-                  (emit-byte #x66))
+                ,@,(when (needs-operand-size-prefix? op-size)
+                     ''((maybe-emit-operand-size-prefix)))
                 (emit-bytes ',',opcode-part)
                 ;; emit immediates, if any
                 ,@,(append
@@ -247,8 +250,8 @@
                      ;; TODO how come rex is nil here for e.g. bswap32r?
                      `(emit-byte ,(logior ,(or rex (logior #x40 rex.w))
                                           (if reg-extra-bit ,rex.b 0))))
-                  (when (needs-operand-size-prefix? ',',op-size)
-                    (emit-byte #x66))
+                  ,@,(when (needs-operand-size-prefix? op-size)
+                       ''((maybe-emit-operand-size-prefix)))
                   (emit-bytes ',',opcode-prefix-bytes)
                   (emit-byte ,(logior ',opcode reg-index))
                   ;; TODO copy-paste from above
