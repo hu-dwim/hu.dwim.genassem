@@ -254,8 +254,8 @@
 
 ;; called on the normalized plist form
 (defun include-instruction? (obj)
-  (declare (ignore obj))
-  t)
+  (null (intersection '(:|HasCMOV| :|HasX87| :|HasMMX|)
+                      (getf obj :predicates))))
 
 (defun process-tablegen-json (stream visitor &key (normalize? t))
   (jzon:with-parser (parser stream)
