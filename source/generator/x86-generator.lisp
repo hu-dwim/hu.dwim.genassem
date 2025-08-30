@@ -57,7 +57,9 @@
           '(:gr8
             :gr16
             :gr32
-            :gr64)
+            :gr64
+            :|GR32orGR64|
+            )
           :test 'eq))
 
 (defun immediate-type? (type)
@@ -226,6 +228,111 @@
                            `(emit-forms/imm ,-name- 64))))))))
         (assert (null parameters))))))
 
+(defun form/mrm (instr name rex prefix-bytes opcode-prefix-bytes opcode)
+  (destructuring-bind (&key form op-size
+                         parameters &allow-other-keys)
+      instr
+    (let* (#+nil(dst-param (map-params! (parameters :single-match? t)
+                             (when (register-type? -type-)
+                               (cons -name- -type-))))
+           (modrm 0)
+           (form-str (symbol-name form))
+           (form-length (length form-str))
+           (reg-param nil))
+;; +---+---+---+---+---+---+---+---+
+;; |   mod  |  reg/opcode |  r/m   |
+;; +---+---+---+---+---+---+---+---+
+;;   7   6     5   4   3     2   1 0
+;;
+;; - mod (2 bits): addressing mode (register, memory, disp8, disp32, etc.)
+;; - reg/opcode (3 bits):
+;;   Normally selects a register operand,
+;;   but in some opcodes, it’s treated as an opcode extension.
+;; - r/m (3 bits): register or memory operand (sometimes extended with SIB if r/m=100).
+
+      (cond
+        ((starts-with-subseq "MRMXr" form-str)
+         ;; TODO
+         (throw :skip-instruction nil))
+        ((and (= 5 form-length)
+              (eql #\r (elt form-str (1- form-length))))
+         ;; MRM0r–MRM7r
+         (let ((idx (- (char-code (elt form-str 3))
+                       (char-code #\0))))
+           (assert (<= 0 idx 7))
+           (setf (ldb (byte 2 6) modrm) #b11) ; TODO ?
+           (setf (ldb (byte 3 3) modrm) idx)
+           (setf reg-param (map-params! (parameters :single-match? t)
+                             (when (register-type? -type-)
+                               (cons -name- -type-))))
+           ))
+        (t
+         ;; TODO
+         (throw :skip-instruction nil)
+         ;; (error "Unexpected MRM form value: ~S" form)
+         ))
+      ;; TODO (assert reg-param)
+      (unless reg-param
+        (throw :skip-instruction nil))
+      (prog1
+          `(define-instruction ,name ,(mapcar 'car (getf instr :parameters))
+             (multiple-value-bind (reg-index reg-mode reg-extra-bit)
+                 (register-name->encoding-bits
+                  ,(car reg-param)
+                  :expected-mode ,(case (cdr reg-param)
+                                    (:gr8 8) ; TODO 8 bit mode? really?
+                                    (:gr16 16)
+                                    (:gr32 32)
+                                    (:gr64 64)
+                                    ;; TODO ecase?
+                                    ))
+               `(progn
+                  (emit-bytes ',',prefix-bytes)
+                  ,(when (eql reg-mode 64)
+                     `(emit-byte ,(logior ,(or rex (logior #x40 rex.w))
+                                          (if reg-extra-bit ,rex.b 0))))
+                  ,@,(when (needs-operand-size-prefix? op-size)
+                       ''((maybe-emit-operand-size-prefix)))
+                  (emit-bytes ',',opcode-prefix-bytes)
+                  (emit-byte ',',opcode)
+                  (emit-byte ',(logior ',modrm reg-index))
+                  ;; TODO copy-paste from above
+                  ,@,(append
+                      '(list)
+                      (map-params! (parameters)
+                        (case -type-
+                          ((:|i8imm|
+                            :|i16i8imm|
+                            :|i32i8imm|
+                            :|i64i8imm|
+                            :|brtarget8|)
+                           `(emit-forms/imm ,-name- 8))
+                          ((:|offset16_8|
+                            :|offset16_16|
+                            :|offset16_32|
+                            :|offset32_8|
+                            :|offset32_16|
+                            :|offset32_32|
+                            :|offset32_64|
+                            :|offset64_8|
+                            :|offset64_16|
+                            :|offset64_32|
+                            :|offset64_64|)
+                           ;; FIXME introduce an API for this
+                           (throw :skip-instruction nil))
+                          (:|u8imm|
+                           `(emit-forms/imm ,-name- 8 nil))
+                          (:|i16imm|
+                           `(emit-forms/imm ,-name- 16))
+                          ((:|i32imm|
+                            :|i64i32imm|
+                            :|i64i32imm_brtarget|)
+                           `(emit-forms/imm ,-name- 32))
+                          (:|i64imm|
+                           `(emit-forms/imm ,-name- 64))))))))
+        ;; TODO (assert (null parameters))
+        ))))
+
 (defun generate-x86-instruction-emitter (instr)
   (catch :skip-instruction
     (bind (((&key name parameters form  ;mnemonic
@@ -279,8 +386,14 @@
                             opcode))
              lisp-name)
             (:mrm
-             ;; TODO
-             )))))))
+             (emit-asm-form
+              (form/mrm instr
+                        lisp-name
+                        rex
+                        (nreverse prefix-bytes)
+                        (nreverse opcode-prefix-bytes)
+                        opcode))
+             lisp-name)))))))
 
 (defun setup-pprint-dispatch ()
   (set-pprint-dispatch
