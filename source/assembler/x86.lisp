@@ -62,10 +62,8 @@
 (define-constant rex.b #x01)
 
 (defun needs-operand-size-prefix? (op-size)
-  (or (and (eq op-size :|OpSize16|)
-           (not (eql (current-execution-mode) 16)))
-      (and (eq op-size :|OpSize32|)
-           (not (eql (current-execution-mode) 64)))))
+  (and (eq op-size :|OpSize16|)
+       (not (eql (current-execution-mode) 16))))
 
 (defun emit-forms/imm (value bits &optional (signed? t))
   `(progn
