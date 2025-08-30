@@ -7,7 +7,7 @@
 (in-package :hu.dwim.genassem)
 
 (defun generate-x86-instruction-emitter (instr)
-  (catch 'cl:continue ; TODO delme or do this properly
+  (catch :skip-instruction
     (bind (((&key name parameters form      ;mnemonic
                   opcode op-map has-rex.w
                   op-prefix             ;op-prefix/explicit
