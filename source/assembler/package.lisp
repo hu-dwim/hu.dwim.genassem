@@ -31,25 +31,27 @@
         )
   (:export
    #:decode-register
+   #:register-name->encoding/segment
    #:register-name->encoding/gr8
    #:register-name->encoding/gr16
    #:register-name->encoding/gr32
    #:register-name->encoding/gr64
    #:maybe-emit-operand-size-prefix
 
+   #:cs #:ds #:es #:fs #:gs #:ss
    #:al #:cl #:dl #:bl #:spl #:bpl #:sil #:dil
    #:ax #:cx #:dx #:bx #:sp #:bp #:si #:di
    #:eax #:ecx #:edx #:ebx #:esp #:ebp #:esi #:edi
    #:rax #:rcx #:rdx #:rbx #:rsp #:rbp #:rsi #:rdi
 
    ;; these are only exported so that the output is not filled with pkg:: prefixes
-   #:reg-mode/dst
-   #:reg-extra-bit/dst
-   #:reg-index/dst
+   #:reg-mode/1
+   #:reg-extra-bit/1
+   #:reg-index/1
 
-   #:reg-mode/src
-   #:reg-extra-bit/src
-   #:reg-index/src
+   #:reg-mode/2
+   #:reg-extra-bit/2
+   #:reg-index/2
 
    #:emit-forms/imm
    ))

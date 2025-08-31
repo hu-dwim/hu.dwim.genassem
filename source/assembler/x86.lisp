@@ -19,6 +19,34 @@
 ;;; Register lookup/decode
 ;;;
 
+(defmacro decode-register (name expected-class)
+  (ecase expected-class
+    (:gr8  `(register-name->encoding/gr8  ,name))
+    (:gr16 `(register-name->encoding/gr16 ,name))
+    (:gr32 `(register-name->encoding/gr32 ,name))
+    (:gr64 `(register-name->encoding/gr64 ,name))
+    (:|GR32orGR64| `(multiple-value-bind (index mode extra-bit)
+                        (register-name->encoding/gr32 ,name nil)
+                      (if index
+                          (values index mode extra-bit)
+                          (register-name->encoding/gr64 ,name))))
+    (:|GR16orGR32orGR64| `(multiple-value-bind (index mode extra-bit)
+                              (register-name->encoding/gr16 ,name nil)
+                            (cond
+                              (index
+                               (values index mode extra-bit))
+                              ((progn
+                                 (multiple-value-setq (index mode extra-bit)
+                                   (register-name->encoding/gr32 ,name nil))
+                                 index)
+                               (values index mode extra-bit))
+                              (t (register-name->encoding/gr64 ,name)))))
+    (:segment_reg
+     `(values (register-name->encoding/segment ,name)
+              -1 ;; TODO ?
+              ()))))
+
+(define-constant +x86-registers/segment+ '(es cs ss ds fs gs) :test 'equal)
 (define-constant +x86-registers/8+  '(al  cl  dl  bl  spl bpl sil dil) :test 'equal)
 (define-constant +x86-registers/16+ '(ax  cx  dx  bx  sp  bp  si  di)  :test 'equal)
 (define-constant +x86-registers/32+ '(eax ecx edx ebx esp ebp esi edi) :test 'equal)
@@ -39,11 +67,15 @@
 (defun unknown-register (name)
   (invalid-instruction-error "Invalid register name: ~S" name))
 
+(defun register-name->encoding/segment (name)
+  (declare (type symbol name))
+  (register-index name +x86-registers/segment+))
+
 (defun register-name->encoding/r-numbered (name expected-class)
   "Returns (values reg-index reg-mode reg-extra-bit)."
   (declare (type symbol name)
            (type (member :gr8 :gr16 :gr32 :gr64
-                         :|GR32orGR64|)
+                         :|GR32orGR64| :|GR16orGR32orGR64|)
                  expected-class))
   (let* ((name/s (symbol-name name))
          (len    (length name/s))
@@ -59,7 +91,9 @@
           (class 64))
       (case last-char
         (#\D
-         (unless (member expected-class '(:gr32 :|GR32orGR64|) :test 'eq)
+         (unless (member expected-class
+                         '(:gr32 :|GR32orGR64| :|GR16orGR32orGR64|)
+                         :test 'eq)
            (unexpected-register name expected-class))
          (setf class 32)
          (decf len))
@@ -149,15 +183,3 @@
        (if otherwise?
            otherwise
            (unexpected-register name :gr64))))))
-
-(defmacro decode-register (name expected-class)
-  (ecase expected-class
-    (:gr8  `(register-name->encoding/gr8  ,name))
-    (:gr16 `(register-name->encoding/gr16 ,name))
-    (:gr32 `(register-name->encoding/gr32 ,name))
-    (:gr64 `(register-name->encoding/gr64 ,name))
-    (:|GR32orGR64| `(multiple-value-bind (index mode extra-bit)
-                        (register-name->encoding/gr32 ,name nil)
-                      (if index
-                          (values index mode extra-bit)
-                          (register-name->encoding/gr64 ,name))))))

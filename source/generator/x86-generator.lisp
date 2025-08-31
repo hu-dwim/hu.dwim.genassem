@@ -39,22 +39,26 @@
              :for ,param :in ,params
              :for result = (destructuring-bind (-name- . -type-) ,param
                              ,@body)
-             :if (and result
-                      (or (not ,single-match?)
-                          (null results)))
+             :if result
                :collect result :into results
              :else
                :collect ,param :into new-params
              :finally
-                (setf ,params new-params)
-                (return (if ,single-match?
-                            (first results)
-                            results))))))
+                (return
+                  (if ,single-match?
+                      (progn
+                        (when result
+                          (setf ,params (remove ,param ,params)))
+                        (first results))
+                      (progn
+                        (setf ,params new-params)
+                        results)))))))
 
-(defmacro pop-reg-param! (params)
-  `(map-params! (,params :single-match? t)
-     (when (register-type? -type-)
-       (cons -name- -type-))))
+(defmacro pop-reg-param! (params &optional (predicate ''register-type?))
+  `(let ((match (find-if ,predicate ,params :key 'cdr)))
+     (when match
+       (setf ,params (remove match ,params)))
+     match))
 
 (defun register-type? (type)
   ;; TODO not using an ecase here is fragile...
@@ -64,8 +68,16 @@
             :gr32
             :gr64
             :|GR32orGR64|
+            :|GR16orGR32orGR64|
+            ;; TODO these are not handled at assembly-time
+            :segment_reg
+            :control_reg
+            :debug_reg
             )
           :test 'eq))
+
+(defun segment-register-type? (type)
+  (eq type :segment_reg))
 
 (defun immediate-type? (type)
   ;; TODO not using an ecase here is fragile...
@@ -170,18 +182,18 @@
       (assert dst-param)
       (prog1
           `(define-instruction ,name ,(mapcar 'car (getf instr :parameters))
-             (multiple-value-bind (reg-index/dst reg-mode/dst reg-extra-bit/dst)
+             (multiple-value-bind (reg-index/1 reg-mode/1 reg-extra-bit/1)
                  (decode-register ,(car dst-param) ,(cdr dst-param))
                `(progn
                   (emit-bytes ',',prefix-bytes)
-                  ,(when (eql reg-mode/dst 64)
+                  ,(when (eql reg-mode/1 64)
                      ;; TODO how come rex is nil here for e.g. bswap32r?
                      `(emit-byte ,(logior ,(or rex (logior #x40 rex.w))
-                                          (if reg-extra-bit/dst ,rex.b 0))))
+                                          (if reg-extra-bit/1 ,rex.b 0))))
                   ,@,(when (needs-operand-size-prefix? op-size)
                        ''((maybe-emit-operand-size-prefix)))
                   (emit-bytes ',',opcode-prefix-bytes)
-                  (emit-byte ,(logior ',opcode reg-index/dst))
+                  (emit-byte ,(logior ',opcode reg-index/1))
                   ;; TODO copy-paste from above
                   ,@,(append
                       '(list)
@@ -250,47 +262,62 @@
          (let ((idx (- (char-code (elt form-str 3))
                        (char-code #\0))))
            (assert (<= 0 idx 7))
-           (setf (ldb (byte 2 6) modrm) #b11) ; TODO ?
+           (setf (ldb (byte 2 6) modrm) #b11)
            (setf (ldb (byte 3 3) modrm) idx)
-           (setf dst-reg-param (pop-reg-param! parameters))))
+           (setf dst-reg-param (pop-reg-param! parameters))
+           ;; This may or may not pop a register.
+           (setf src-reg-param (pop-reg-param! parameters))))
 ;;;
 ;;; MRMDestReg
 ;;;
-        ((equal form-str "MRMDestReg")
-         (setf (ldb (byte 2 6) modrm) #b11) ; TODO ?
-         (setf dst-reg-param (pop-reg-param! parameters))
-         (setf src-reg-param (pop-reg-param! parameters)))
+        ((or (equal form-str "MRMDestReg")
+             (equal form-str "MRMSrcReg"))
+         (setf (ldb (byte 2 6) modrm) #b11)
+         (let ((segment-reg
+                 (pop-reg-param! parameters 'segment-register-type?)))
+           (when segment-reg
+             ;; ...then we need to make sure the segment register is
+             ;; in src for te right encoding. this is somwhat kludgey.
+             (setf src-reg-param segment-reg))
+           (setf dst-reg-param (pop-reg-param! parameters))
+           (unless src-reg-param
+             (setf src-reg-param (pop-reg-param! parameters)))))
+
         (t
          ;; TODO
          (throw :skip-instruction nil)
          ;; (error "Unexpected MRM form value: ~S" form)
          ))
-      ;; TODO (assert dst-reg-param)
-      (unless dst-reg-param
-        (break)
+      (assert dst-reg-param)
+      (when (intersection (list (cdr dst-reg-param) (cdr src-reg-param))
+                          '(:control_reg
+                            ;;:segment_reg
+                            :debug_reg))
+        ;; TODO
         (throw :skip-instruction nil))
       (prog1
           `(define-instruction ,name ,(mapcar 'car (getf instr :parameters))
-             (multiple-value-bind (reg-index/dst reg-mode/dst reg-extra-bit/dst)
+             (multiple-value-bind (reg-index/1 reg-mode/1 reg-extra-bits/1)
                  (decode-register ,(car dst-reg-param) ,(cdr dst-reg-param))
                (,@(if (not src-reg-param)
                       '(progn)
-                      `(multiple-value-bind (reg-index/src reg-mode/src reg-extra-bit/src)
-                           (decode-register ,(car src-reg-param) ,(cdr src-reg-param))))
+                      `(multiple-value-bind (reg-index/2 reg-mode/2 reg-extra-bit/2)
+                           (decode-register ,(car src-reg-param) ,(cdr src-reg-param))
+                         (declare (ignorable reg-mode/2 reg-extra-bit/2))))
                 `(progn
                    (emit-bytes ',',prefix-bytes)
                    ;; TODO when expected-mode is present and it's not
                    ;; 64 then this whole WHEN is unnecessary
-                   ,(when (eql reg-mode/dst 64)
+                   ,(when (eql reg-mode/1 64)
                       `(emit-byte ,(logior ,(or rex (logior #x40 rex.w))
-                                           (if reg-extra-bit/dst ,rex.b 0))))
+                                           (if reg-extra-bits/1 ,rex.b 0))))
                    ,@,(when (needs-operand-size-prefix? op-size)
                         ''((maybe-emit-operand-size-prefix)))
                    (emit-bytes ',',opcode-prefix-bytes)
                    (emit-byte ',',opcode)
-                   (emit-byte ',(logior ',modrm reg-index/dst
+                   (emit-byte ',(logior ',modrm reg-index/1
                                         ,@(when src-reg-param
-                                            `((ash reg-index/src 3)))))
+                                            `((ash reg-index/2 3)))))
                    ;; TODO copy-paste from above
                    ,@,(append
                        '(list)
