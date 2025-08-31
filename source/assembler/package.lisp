@@ -32,4 +32,15 @@
   (:export
    #:register-name->encoding-bits
    #:maybe-emit-operand-size-prefix
+
+   #:al #:cl #:dl #:bl #:spl #:bpl #:sil #:dil
+   #:ax #:cx #:dx #:bx #:sp #:bp #:si #:di
+   #:eax #:ecx #:edx #:ebx #:esp #:ebp #:esi #:edi
+   #:rax #:rcx #:rdx #:rbx #:rsp #:rbp #:rsi #:rdi
+
+   ;; these are only exported so that the output is not filled with pkg:: prefixes
+   #:reg-mode
+   #:reg-extra-bit
+   #:reg-index
+   #:emit-forms/imm
    ))

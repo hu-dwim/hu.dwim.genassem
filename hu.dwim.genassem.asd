@@ -79,4 +79,6 @@
   :components ((:module "test"
                 :components ((:file "package")
                              (:file "suite" :depends-on ("package"))
-                             (:file "simple" :depends-on ("package" "suite"))))))
+                             (:file "simple" :depends-on ("package" "suite"))
+                             (:file "infra" :depends-on ("package" "suite"))
+                             ))))

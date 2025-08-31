@@ -130,11 +130,13 @@
       (_bswap32r edx)
       (_bswap64r rbx)
       (_bswap64r r14)
+      (_bswap64r rsp)
       (_mov16ri #x1122 bx)
       "00000000  0FCA              bswap edx
 00000002  480FCB            bswap rbx
 00000005  490FCE            bswap r14
-00000008  66BB2211          mov bx,0x1122
+00000008  480FCC            bswap rsp
+0000000B  66BB2211          mov bx,0x1122
 ")
      ((bits 64)
       (_mov16ri #x1122 bx)
@@ -148,17 +150,22 @@
       (_adc64ri32 #x11223344 rax)
       (_adc64ri8 #x42 rbx)
       (_adc64ri8 #x42 r15)
+      (_adc64ri8 #x42 rsi)
       (_tpause ecx)
       (_tpause edx)
-      (_test8i8 #x42)
-      ;; TODO (_test8ri #x42 ah)
+      (_test8i8 #x42)    ; same as next, but special encoding
+      (_test8ri #x42 al)
+      (_test8ri #x42 bl)
       "00000000  6681D02211        adc ax,0x1122
 00000005  4881D044332211    adc rax,0x11223344
 0000000C  4883D342          adc rbx,byte +0x42
 00000010  4983D742          adc r15,byte +0x42
-00000014  660FAEF1          tpause ecx
-00000018  660FAEF2          tpause edx
-0000001C  A842              test al,0x42
+00000014  4883D642          adc rsi,byte +0x42
+00000018  660FAEF1          tpause ecx
+0000001C  660FAEF2          tpause edx
+00000020  A842              test al,0x42
+00000022  F6C042            test al,0x42
+00000025  F6C342            test bl,0x42
 "))))
 
 (deftest invalids ()
