@@ -143,29 +143,69 @@
       "00000000  66BB2211          mov bx,0x1122
 "))))
 
+(deftest form/mrm/srcreg ()
+  (test-using-external-assembler
+   '(((bits 64)
+      (_adcx32rr ebx eax)
+      (_adcx64rr rcx r10)
+      "00000000  660F38F6C3        adcx eax,ebx
+00000005  664C0F38F6D1      adcx r10,rcx
+"))))
+
 (deftest form/mrm ()
   (test-using-external-assembler
    '(((bits 64)
+      (_adc16rr bx ax)
       (_adc16ri #x1122 ax)
       (_adc64ri32 #x11223344 rax)
-      (_adc64ri8 #x42 rbx)
-      (_adc64ri8 #x42 r15)
-      (_adc64ri8 #x42 rsi)
+      (_adc64ri8 #x11 rbx)
+      (_adc64ri8 #x11 r15)
+      (_adc64ri8 #x11 rsi)
       (_tpause ecx)
       (_tpause edx)
-      (_test8i8 #x42)    ; same as next, but special encoding
-      (_test8ri #x42 al)
-      (_test8ri #x42 bl)
-      "00000000  6681D02211        adc ax,0x1122
-00000005  4881D044332211    adc rax,0x11223344
-0000000C  4883D342          adc rbx,byte +0x42
-00000010  4983D742          adc r15,byte +0x42
-00000014  4883D642          adc rsi,byte +0x42
-00000018  660FAEF1          tpause ecx
-0000001C  660FAEF2          tpause edx
-00000020  A842              test al,0x42
-00000022  F6C042            test al,0x42
-00000025  F6C342            test bl,0x42
+      (_test8i8 #x11)    ; same as next, but special encoding
+      (_test8ri #x11 al)
+      (_test8ri #x11 bl)
+      "00000000  6611C3            adc bx,ax
+00000003  6681D02211        adc ax,0x1122
+00000008  4881D044332211    adc rax,0x11223344
+0000000F  4883D311          adc rbx,byte +0x11
+00000013  4983D711          adc r15,byte +0x11
+00000017  4883D611          adc rsi,byte +0x11
+0000001B  660FAEF1          tpause ecx
+0000001F  660FAEF2          tpause edx
+00000023  A811              test al,0x11
+00000025  F6C011            test al,0x11
+00000028  F6C311            test bl,0x11
+"))))
+
+;; TODO
+;; (deftest form/mrm/vex ()
+;;   (test-using-external-assembler
+;;    '(((bits 64)
+;;       (_blsi32rr edx ebx)
+;;       "00000000  C4E260F3DA        blsi ebx,edx
+;; "))))
+
+(deftest form/mrm/segment ()
+  (test-using-external-assembler
+   '(((bits 64)
+      (_mov16rs fs cx)
+      (_mov16rs gs bx)
+      (_mov16rs fs cx)
+      (_mov16rs es dx)
+      (_mov16sr cx fs)
+      (_mov16sr bx gs)
+      (_mov16sr cx fs)
+      (_mov16sr dx es)
+      "00000000  668CE1            mov cx,fs
+00000003  668CEB            mov bx,gs
+00000006  668CE1            mov cx,fs
+00000009  668CC2            mov dx,es
+0000000C  668EE1            mov fs,cx
+0000000F  668EEB            mov gs,bx
+00000012  668EE1            mov fs,cx
+00000015  668EC2            mov es,dx
 "))))
 
 (deftest invalids ()

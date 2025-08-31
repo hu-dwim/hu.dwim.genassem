@@ -300,20 +300,23 @@
         (throw :skip-instruction nil))
       (prog1
           `(define-instruction ,name ,(mapcar 'car (getf instr :parameters))
-             (multiple-value-bind (reg-index/1 reg-mode/1 reg-extra-bits/1)
+             (multiple-value-bind (reg-index/1 reg-mode/1 reg-extra-bit/1)
                  (decode-register ,(car dst-reg-param) ,(cdr dst-reg-param))
                (,@(if (not src-reg-param)
                       '(progn)
                       `(multiple-value-bind (reg-index/2 reg-mode/2 reg-extra-bit/2)
-                           (decode-register ,(car src-reg-param) ,(cdr src-reg-param))
-                         (declare (ignorable reg-mode/2 reg-extra-bit/2))))
+                           (decode-register ,(car src-reg-param) ,(cdr src-reg-param))))
                 `(progn
                    (emit-bytes ',',prefix-bytes)
                    ;; TODO when expected-mode is present and it's not
                    ;; 64 then this whole WHEN is unnecessary
-                   ,(when (eql reg-mode/1 64)
+                   ,(when (or (eql reg-mode/1 64)
+                              ,@(when src-reg-param
+                                  `((eql reg-mode/2 64))))
                       `(emit-byte ,(logior ,(or rex (logior #x40 rex.w))
-                                           (if reg-extra-bits/1 ,rex.b 0))))
+                                           (if reg-extra-bit/1 ,rex.b 0)
+                                           ,@(when src-reg-param
+                                               `((if reg-extra-bit/2 ,rex.r 0))))))
                    ,@,(when (needs-operand-size-prefix? op-size)
                         ''((maybe-emit-operand-size-prefix)))
                    (emit-bytes ',',opcode-prefix-bytes)
@@ -364,7 +367,7 @@
 (defun generate-x86-instruction-emitter (instr)
   (catch :skip-instruction
     (bind (((&key name parameters form  ;mnemonic
-                  opcode op-map has-rex.w
+                  opcode op-enc op-map has-rex.w
                   op-prefix             ;op-prefix/explicit
                   form-category has-position-order
                   &allow-other-keys) instr)
@@ -373,38 +376,45 @@
            (opcode-prefix-bytes ())
            (rex (when has-rex.w
                   (logior #x40 rex.w))))
-      ;;(format *error-output* "~&; emitting ~S / ~S~%" name mnemonic)
+      ;;(format *error-output* "~&; emitting ~S~%" name)
       (assert (<= opcode 255))
       (assert has-position-order)
-      (emit-comment form " " name " " parameters)
+      (emit-comment form " " name " " parameters " " opcode
+                    " " op-enc " " op-prefix " " op-map)
       (progn
-        (ecase op-prefix
-          ((nil)     ())
-          (:pd       (push #x66 prefix-bytes))
-          ((:sd :xd) (push #xf2 prefix-bytes))
-          ((:ps :xs) (push #xf3 prefix-bytes)))
-        (ecase op-map
-          (:ob)
-          ((:tb) (push #x0f opcode-prefix-bytes))
-          ((:t8)
-           (push #x0f opcode-prefix-bytes)
-           (push #x38 opcode-prefix-bytes))
-          ((:ta)
-           (push #x0f opcode-prefix-bytes)
-           (push #x3a opcode-prefix-bytes))
-          ((:xop8)
-           (push #x8f opcode-prefix-bytes)
-           (push #x08 opcode-prefix-bytes))
-          ((:xop9)
-           (push #x8f opcode-prefix-bytes)
-           (push #x90 opcode-prefix-bytes))
-          ((:xopa)
-           (push #x8f opcode-prefix-bytes)
-           (push #x0a opcode-prefix-bytes))
-          ((:t_map4 :t_map5 :t_map6 :t_map7)
-           ;; under EVEX encoding it is selected with mm=100b in the EVEX/VEX prefix.
-           (throw :skip-instruction nil)))
-
+        (ecase op-enc
+          (:|EncEVEX|
+           (throw :skip-instruction nil))
+          (:|EncVEX|
+           (throw :skip-instruction nil))
+          (:|EncXOP|
+           (throw :skip-instruction nil))
+          (:|EncNormal|
+           (ecase op-prefix
+             ((nil)     ())
+             (:pd       (push #x66 prefix-bytes))
+             ((:sd :xd) (push #xf2 prefix-bytes))
+             ((:ps :xs) (push #xf3 prefix-bytes))
+             ;;((:ps :xs) (push #xc4 prefix-bytes))
+             )
+           (ecase op-map
+             (:ob)
+             ((:tb) (push #x0f opcode-prefix-bytes))
+             ((:t8)
+              (push #x0f opcode-prefix-bytes)
+              (push #x38 opcode-prefix-bytes))
+             ((:ta)
+              (push #x0f opcode-prefix-bytes)
+              (push #x3a opcode-prefix-bytes))
+             ((:xop8)
+              (push #x8f opcode-prefix-bytes)
+              (push #x08 opcode-prefix-bytes))
+             ((:xop9)
+              (push #x8f opcode-prefix-bytes)
+              (push #x90 opcode-prefix-bytes))
+             ((:xopa)
+              (push #x8f opcode-prefix-bytes)
+              (push #x0a opcode-prefix-bytes)))))
         (let ()
           ;; (when (equal mnemonic "adc{w}	{$src, %ax|ax, $src}")
           ;;   (break))
