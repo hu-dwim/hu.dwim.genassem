@@ -168,20 +168,8 @@
       (prog1
           `(define-instruction ,name ,(mapcar 'car (getf instr :parameters))
              (multiple-value-bind (reg-index reg-mode reg-extra-bit)
-                 (register-name->encoding-bits
-                  ,(car dst-param)
-                  :expected-mode ,(ecase (cdr dst-param)
-                                    (:gr8 8)
-                                    (:gr16 16)
-                                    (:gr32 32)
-                                    (:gr64 64)
-                                    ((:|i8imm|
-                                      :|i16imm|
-                                      :|i32imm|
-                                      :|i64imm|
-                                      )
-                                     ;; TODO
-                                     )))
+                 (register-name->encoding-bits ,(car dst-param)
+                                               :expected-class ,(cdr dst-param))
                `(progn
                   (emit-bytes ',',prefix-bytes)
                   ,(when (eql reg-mode 64)
@@ -277,15 +265,8 @@
       (prog1
           `(define-instruction ,name ,(mapcar 'car (getf instr :parameters))
              (multiple-value-bind (reg-index reg-mode reg-extra-bit)
-                 (register-name->encoding-bits
-                  ,(car reg-param)
-                  :expected-mode ,(case (cdr reg-param)
-                                    (:gr8 8) ; TODO 8 bit mode? really?
-                                    (:gr16 16)
-                                    (:gr32 32)
-                                    (:gr64 64)
-                                    ;; TODO ecase?
-                                    ))
+                 (register-name->encoding-bits ,(car reg-param)
+                                               :expected-class ,(cdr reg-param))
                `(progn
                   (emit-bytes ',',prefix-bytes)
                   ,(when (eql reg-mode 64)

@@ -23,18 +23,23 @@
           default
           (error "Unexpected register name: ~S" name))))
 
-(defun register-name->encoding-bits (name &key expected-mode)
+(defun register-name->encoding-bits (name &key expected-class)
   "Returns (values reg-index reg-mode reg-extra-bit)."
   (declare (optimize (debug 3))
-           (type symbol name))
+           (type symbol name)
+           (type (member nil :gr8 :gr16 :gr32 :gr64
+                         :|GR32orGR64|)
+                 expected-class))
   (flet ((illegal-register ()
            (invalid-instruction-error
-            "Trying to use register ~S in ~S bit mode" name expected-mode)))
+            "Trying to use register ~S while expecting a ~S" name expected-class)))
     (let ((name/s (symbol-name name)))
       (case (elt name/s 0)
         (#\R
-         (when (and expected-mode
-                    (not (eql expected-mode 64)))
+         (when (and expected-class
+                    (not (member expected-class
+                                 '(:gr64 :|GR32orGR64| :|GR16orGR32orGR64|)
+                                 :test 'eq)))
            (illegal-register))
          (aif (register-index name +x86-registers/64+ nil)
               (values it 64 nil)
@@ -52,13 +57,18 @@
                         (logand #b111 index))
                       64 1)))
         (#\E
-         (when (and expected-mode
-                    (not (eql expected-mode 32)))
+         (when (and expected-class
+                    (not (member expected-class
+                                 '(:gr32 :|GR32orGR64| :|GR16orGR32orGR64|)
+                                 :test 'eq)))
            (illegal-register))
          (values (register-index name +x86-registers/32+) 32 nil))
         (t
-         (when (and expected-mode
-                    (not (eql expected-mode 16)))
+         ;; TODO also handle al/ah and co.
+         (when (and expected-class
+                    (not (member expected-class
+                                 '(:gr16 :|GR16orGR32orGR64|)
+                                 :test 'eq)))
            (illegal-register))
          (values (register-index name +x86-registers/16+) 16 nil))))))
 
