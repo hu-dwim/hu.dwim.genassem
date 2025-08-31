@@ -90,6 +90,7 @@
 
       ;;(set-field :form-bits (json/bitfield-value obj "FormBits"))
       (set-field :opcode (json/bitfield-value obj "Opcode"))
+      (set-field :op-enc (json/def-like-value obj "OpEnc"))
       (set-field :has-position-order (json/true-value? obj "HasPositionOrder"))
       (set-field :has-rex.w (json/true-value? obj "hasREX_W"))
       (set-field :immt (json/def-like-value obj "ImmT"))
@@ -254,8 +255,12 @@
 
 ;; called on the normalized plist form
 (defun include-instruction? (obj)
-  (null (intersection '(:|HasCMOV| :|HasX87| :|HasMMX|)
-                      (getf obj :predicates))))
+  (and (null (intersection '(:|HasCMOV| :|HasX87| :|HasMMX|
+                             :|HasAES| :|NoAVX| :|HasBMI| :|HasSSE4A|
+                             :|HasDQI| :|HasBWI| :|HasKL| :|UseSSSE3|)
+                           (getf obj :predicates)))
+       (not (member (getf obj :op-enc) '("EncVEX") :test 'equal))
+       (not (member (getf obj :op-map) '(:|ThreeDNow|) :test 'eq))))
 
 (defun process-tablegen-json (stream visitor &key (normalize? t))
   (jzon:with-parser (parser stream)

@@ -61,6 +61,9 @@
      match))
 
 (defun register-type? (type)
+  (when (eq type :vr128)
+    ;; KLUDGE
+    (throw :skip-instruction nil))
   ;; TODO not using an ecase here is fragile...
   (member type
           '(:gr8
