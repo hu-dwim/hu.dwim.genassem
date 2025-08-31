@@ -30,7 +30,11 @@
         :hu.dwim.genassem/asm-common
         )
   (:export
-   #:register-name->encoding-bits
+   #:decode-register
+   #:register-name->encoding/gr8
+   #:register-name->encoding/gr16
+   #:register-name->encoding/gr32
+   #:register-name->encoding/gr64
    #:maybe-emit-operand-size-prefix
 
    #:al #:cl #:dl #:bl #:spl #:bpl #:sil #:dil
@@ -39,8 +43,13 @@
    #:rax #:rcx #:rdx #:rbx #:rsp #:rbp #:rsi #:rdi
 
    ;; these are only exported so that the output is not filled with pkg:: prefixes
-   #:reg-mode
-   #:reg-extra-bit
-   #:reg-index
+   #:reg-mode/dst
+   #:reg-extra-bit/dst
+   #:reg-index/dst
+
+   #:reg-mode/src
+   #:reg-extra-bit/src
+   #:reg-index/src
+
    #:emit-forms/imm
    ))
