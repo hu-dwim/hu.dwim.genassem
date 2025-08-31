@@ -30,6 +30,7 @@
              :while (< offset bits)
              :collect `(emit-byte (ldb (byte 8 ,offset) ,value)))))
 
+;; TODO drop the unused single-match? complexity
 (defmacro map-params! ((params &key (single-match? nil)) &body body)
   "What the name suggests, except that it also consumes/removes the param from the list when body returns with non-nil."
   (with-unique-names (param)

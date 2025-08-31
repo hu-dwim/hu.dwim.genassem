@@ -38,6 +38,50 @@ https://en.wikipedia.org/wiki/X86-64#Microarchitecture_levels
 | x86-64-v3 ~2013 | AVX, AVX2, BMI1, BMI2, F16C, FMA, LZCNT, MOVBE, OSXSAVE |
 | x86-64-v4 ~2017 | AVX512F, AVX512BW, AVX512CD, AVX512DQ, AVX512VL         |
 +-----------------+---------------------------------------------------------+
+*** #registers
+| 64-bit | 32-bit   | 16-bit   | 8-bit (low) | 8-bit (high / special) |
+| ------ | -------- | -------- | ----------- | ---------------------- |
+| RAX    | EAX      | AX       | AL          | AH (no REX)            |
+| RBX    | EBX      | BX       | BL          | BH (no REX)            |
+| RCX    | ECX      | CX       | CL          | CH (no REX)            |
+| RDX    | EDX      | DX       | DL          | DH (no REX)            |
+| RSI    | ESI      | SI       | SIL (REX)   | —                      |
+| RDI    | EDI      | DI       | DIL (REX)   | —                      |
+| RBP    | EBP      | BP       | BPL (REX)   | —                      |
+| RSP    | ESP      | SP       | SPL (REX)   | —                      |
+| R8–R15 | R8D–R15D | R8W–R15W | R8B–R15B    | —                      |
+
+x87 FPU stack (mostly obsolete):
+ - 8 registers: ST(0)–ST(7)
+ - 80-bit internally, addressable as 32/64/80 bits depending on instruction.
+ - Mostly legacy
+
+MMX registers (Obsolete, replaced by XMM/YMM/ZMM.):
+ - MM0–MM7 (64-bit)
+ - Aliases of ST(0)–ST(7)
+
+SSE / AVX:
+ - XMM0–XMM15: 128-bit (SSE/AVX base)
+ - YMM0–YMM15: 256-bit (AVX)
+ - ZMM0–ZMM31: 512-bit (AVX-512)
+ - Lower halves alias (ZMM → YMM → XMM).
+
+Mask registers (AVX-512):
+ - K0–K7 (or K0–K31 with EVEX) — 64-bit masks used for predication.
+
+Control Registers:
+ - CR0, CR2, CR3, CR4, CR8 (64-bit mode).
+ - CR1, CR5–CR7 are reserved/unused.
+ - Used for paging, system control, etc.
+
+Debug Registers:
+ - DR0–DR7, DR8–DR15 (depending on CPU).
+ - Used for hardware breakpoints, debugging.
+
+System Registers:
+ - GDTR, IDTR — descriptor table registers
+ - LDTR, TR — task register and local descriptor table
+ - MSRs (Model Specific Registers) — accessible with RDMSR / WRMSR
 *** encoding and prefixes
 https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/X86/MCTargetDesc/X86MCCodeEmitter.cpp#L1555
 
@@ -51,17 +95,20 @@ prefix byte order:
 
 0F: two-byte opcode escape prefix
 **** ModR/M
-[Mod][Reg/Opcode][R/M]
++---+---+---+---+---+---+---+---+
+|   mod   |   reg/opcode  | r/m |
++---+---+---+---+---+---+---+---+
+  7   6     5   4   3     2   1 0
 
-- Mod (2 bits) → addressing mode / displacement size
-   00 → no displacement (except special cases)
-   01 → 8-bit displacement
-   10 → 32-bit displacement
-   11 → operand is a register
+- mod (2 bits): addressing mode (register, memory, disp8, disp32, etc.)
+- reg/opcode (3 bits):
+  Normally selects a register operand.
+  But in some opcodes, it’s treated as an opcode extension — this is where the /r vs /digit notation comes in.
+- r/m (3 bits): register or memory operand (sometimes extended with SIB if r/m=100).
 
-- Reg/Opcode (3 bits) → register or opcode extension
+/r → The instruction has a register operand encoded in the reg field of ModR/M.
+/digit (like /0, /1, … /7) → The reg field is not a register but an opcode extension.
 
-- R/M (3 bits) → register or memory operand
 
 000	EAX	RAX
 001	ECX	RCX
@@ -78,10 +125,10 @@ Special rule:
 Emit this when using 64-bit operands or registers R8–R15.
 
 REX:  0 1 0 0 W R X B (0x4_)
-W changes the operand size to 64 bits
-R extra 4th bit of reg
-B expands r/m (or opreg in the few opcodes that encode the register in the 3 lowest opcode bits, such as "POP reg")
-X and B expand index and base in the SIB byte
+REX.W changes the operand size to 64 bits
+REX.R extra 4th bit of reg
+REX.B expands r/m (or opreg in the few opcodes that encode the register in the 3 lowest opcode bits, such as "POP reg")
+REX.X and B expand index and base in the SIB byte
 
 REX2: 0xD5
       M0 R4 X4 B4 W R3 X3 B3
@@ -151,6 +198,51 @@ https://en.wikipedia.org/wiki/VEX_prefix#REX
                 | → EVEX.R’, EVEX.V’, EVEX.B’ |
                 +-----------------------------+
 
+** arm (aarch64)
+- Fixed width: All instructions are 32 bits wide. (Contrast with ARMv7 which had 16/32-bit Thumb mixes.)
+- Structured fields: Instructions are divided into major classes based on a top set of opcode bits. These high-order bits effectively define a decoder space.
+- Orthogonality: Within each class, operand fields (registers, immediates, shifts) tend to sit in consistent bit positions.
+
+ARM defines the encoding space by the top 11 bits of the instruction word (op[31:21]). These select a major opcode group:
+ - Data Processing – Immediate
+ - Branch, Exception, and System
+ - Loads and Stores
+ - Data Processing – Register
+ - Floating-point / Advanced SIMD
+ - Reserved/other
+Each group subdivides further based on sub-opcodes.
+
+5-bit register fields → support up to 32 architectural registers (X0–X30, plus SP/ZR special cases).
+Encoding reuses the same 5-bit field for integer and FP registers, context decides interpretation.
+Special registers (e.g. SP) are often encoded as 11111.
+
+Endianness: AArch64 supports both little and big endian, but in practice, little-endian dominates and will continue to.
+*** instruction anatomy
+31   30   29  28..24  23..22  21..10  9..5  4..0
+sf | op | S | 10001  | sh    | imm12 | Rn  | Rd
+sf (bit 31): 0 = 32-bit op, 1 = 64-bit op
+
+op (bit 30): 0 = ADD, 1 = SUB
+S (bit 29): 0 = normal, 1 = set flags (ADDS/SUBS)
+10001 (bits 28..24): fixed pattern
+sh (bits 23..22): shift amount (0 = no shift, 1 = LSL12)
+imm12 (bits 21..10): 12-bit unsigned immediate
+Rn (bits 9..5): source register
+Rd (bits 4..0): destination register
+*** Immediates
+ARM encodings are compact but have lots of “shaped immediates”:
+ - Logical immediates: encoded as a bitmask pattern (N:immr:imms). This encodes values like 0x00FF00FF.
+ - Add/sub immediates: 12-bit unsigned immediate with an optional shift by 12.
+ - Branch immediates: signed, PC-relative, width depends on branch type (e.g. 26-bit for B/BL, 19-bit for conditional).
+ - Move wide immediates (MOVZ/MOVN/MOVK): 16-bit immediate plus a 2-bit shift (positioning a halfword).
+*** ARM TableGen
+Encoding tables from LLVM: TableGen already maps each instruction mnemonic to bit patterns + operand kinds. You’ll mostly need to implement operand encoders (e.g. how to transform an arbitrary constant into the N:immr:imms fields).
+
+Consistency: Register fields are always 5 bits, branch displacements are always PC-relative, shifts are limited and encoded in small fields.
+
+Aliases: Many ARM mnemonics are aliases (MOV → ORR with zero register). Decide early if you want to expose canonical encodings only, or handle aliases.
+
+Scalability: ARM keeps extending the architecture (SVE, SME, pointer auth, MTE). The base encoding model doesn’t change — still 32-bit instructions, still slotting into the same high-level opcode groups. Future features just eat more of the currently “reserved” spaces.
 ** TableGen
 https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/X86/MCTargetDesc/X86BaseInfo.h
 *** 32/64 versions; e.g. bswap32r vs bswap64r
@@ -313,6 +405,10 @@ MRM family (special ModR/M encodings; the instruction is distinguished by the Mo
 | **MRM\_0F**       | All `0F xx` two-byte opcodes | Means this opcode uses `0F` escape prefix.                   | Treat normally; JSON gives operands.                                    |
 | **MRM\_C1, C2 …** | Many FPU instructions        | Opcode group distinguished by ModR/M reg field = 001b, 010b… | Usually no operands (implicit ST registers). Ignore JSON `$src`/`$dst`. |
 
+MRMXr means:
+ - Instruction encoding uses a ModR/M byte.
+ - The reg field of ModR/M is fixed to some constant (the opcode extension).
+ - The operand is a register (rm = reg).
 
 others:
 | Form                 | Example Mnemonics                        | Meaning                                                        | Assembler action                                      |
@@ -336,6 +432,32 @@ others:
    MRM0m–MRM7m, MRM0r–MRM7r: where /0.../7 are fixed sub-opcode encodings.
    And MRMXm, MRMXr: extended mappings.
    Plus MRM_C0..MRM_FF: hard-coded 2nd opcode or reg field mapping.
+**** OpMap
+| `OpMap`     | Legacy escape sequence     | Notes                                          |
+| ----------- | -------------------------- | ---------------------------------------------- |
+| **Default** | *(none)*                   | one-byte opcodes                               |
+| **0F**      | `0F`                       | original two-byte map                          |
+| **T8**      | `0F 38`                    | three-byte map 1                               |
+| **TA**      | `0F 3A`                    | three-byte map 2                               |
+| **T\_MAP4** | `0F 3A` (EVEX/VEX mm=100b) | semantically distinct map 4 (used for AVX-512) |
+| **XOP8**    | `8F 08`                    | AMD XOP map 8                                  |
+| **XOP9**    | `8F 09`                    | AMD XOP map 9                                  |
+| **XOPA**    | `8F 0A`                    | AMD XOP map A                                  |
+| **3DNow**   | `0F 0F` + imm8             | AMD 3DNow!                                     |
+
+In VEX/EVEX prefixes, there are 3 bits (mm) that select the opcode map.
+LLVM exposes those as OpMap values.
+| `mm` bits | LLVM `OpMap` | Legacy escape sequence | Notes                       |
+| --------- | ------------ | ---------------------- | --------------------------- |
+| `000`     | **Default**  | 1-byte opcodes         | legacy / default map        |
+| `001`     | **0F**       | `0F`                   | two-byte opcodes            |
+| `010`     | **T8**       | `0F 38`                | three-byte map 1            |
+| `011`     | **TA**       | `0F 3A`                | three-byte map 2            |
+| `100`     | **T\_MAP4**  | `0F 3A` (EVEX only)    | distinct map 4 (VNNI, etc.) |
+| `101`     | **T\_MAP5**  | EVEX only              | reserved / future Intel use |
+| `110`     | **T\_MAP6**  | EVEX only              | reserved / future Intel use |
+| `111`     | **T\_MAP7**  | EVEX only              | reserved / future Intel use |
+
 **** TSFlags
 https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/X86/MCTargetDesc/X86BaseInfo.h#L692
 
