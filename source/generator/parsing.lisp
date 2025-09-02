@@ -255,12 +255,12 @@
 
 ;; called on the normalized plist form
 (defun include-instruction? (obj)
-  (and (null (intersection '(:|HasCMOV| :|HasX87| :|HasMMX|
-                             :|HasAES| :|NoAVX| :|HasBMI| :|HasSSE4A|
-                             :|HasDQI| :|HasBWI| :|HasKL| :|UseSSSE3|)
-                           (getf obj :predicates)))
-       (not (member (getf obj :op-enc) '("EncVEX") :test 'equal))
-       (not (member (getf obj :op-map) '(:|ThreeDNow|) :test 'eq))))
+  ;; (:|HasCMOV| :|HasX87| :|HasMMX|
+  ;;  :|HasAES| :|NoAVX| :|HasBMI| :|HasSSE4A|
+  ;;  :|HasDQI| :|HasBWI| :|HasKL| :|UseSSSE3|)
+  (null (intersection '(:|HasSSE4A|     ; AMD only extension
+                        )
+                      (getf obj :predicates))))
 
 (defun process-tablegen-json (stream visitor &key (normalize? t))
   (jzon:with-parser (parser stream)

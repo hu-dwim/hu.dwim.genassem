@@ -62,9 +62,6 @@
      match))
 
 (defun register-type? (type)
-  (when (eq type :vr128)
-    ;; KLUDGE
-    (throw :skip-instruction nil))
   ;; TODO not using an ecase here is fragile...
   (member type
           '(:gr8
@@ -73,6 +70,11 @@
             :gr64
             :|GR32orGR64|
             :|GR16orGR32orGR64|
+            :vr64
+            :vr128
+            :vr256
+            :vr512
+            :|RSTi|
             ;; TODO these are not handled at assembly-time
             :segment_reg
             :control_reg
@@ -160,8 +162,7 @@
                           :|offset64_32|
                           :|offset64_64|)
                          ;; these are de facto obsolete, let's just skip them...
-                         ;; FIXME introduce an API for this
-                         (throw :skip-instruction nil))
+                         (skip-instruction))
                         (:|u8imm|
                          `(emit-forms/imm ,-name- 8 nil))
                         ((:|i16imm|
@@ -220,8 +221,7 @@
                             :|offset64_16|
                             :|offset64_32|
                             :|offset64_64|)
-                           ;; FIXME introduce an API for this
-                           (throw :skip-instruction nil))
+                           (skip-instruction))
                           (:|u8imm|
                            `(emit-forms/imm ,-name- 8 nil))
                           (:|i16imm|
@@ -255,9 +255,6 @@
 ;; - r/m (3 bits): register or memory operand (sometimes extended with SIB if r/m=100).
 
       (cond
-        ((starts-with-subseq "MRMXr" form-str)
-         ;; TODO
-         (throw :skip-instruction nil))
 ;;;
 ;;; MRM0r–MRM7r
 ;;;
@@ -289,7 +286,7 @@
 
         (t
          ;; TODO
-         (throw :skip-instruction nil)
+         (skip-instruction)
          ;; (error "Unexpected MRM form value: ~S" form)
          ))
       (assert dst-reg-param)
@@ -298,7 +295,7 @@
                             ;;:segment_reg
                             :debug_reg))
         ;; TODO
-        (throw :skip-instruction nil))
+        (skip-instruction))
       (prog1
           `(define-instruction ,name ,(mapcar 'car (getf instr :parameters))
              (multiple-value-bind (reg-index/1 reg-mode/1 reg-extra-bit/1)
@@ -347,8 +344,7 @@
                              :|offset64_16|
                              :|offset64_32|
                              :|offset64_64|)
-                            ;; FIXME introduce an API for this
-                            (throw :skip-instruction nil))
+                            (skip-instruction))
                            ((:|u8imm|
                              :|i16u8imm|
                              :|i32u8imm|
@@ -365,6 +361,9 @@
         ;; TODO (assert (null parameters))
         ))))
 
+(defun skip-instruction ()
+  (throw :skip-instruction nil))
+
 (defun generate-x86-instruction-emitter (instr)
   (catch :skip-instruction
     (bind (((&key name parameters form  ;mnemonic
@@ -380,16 +379,16 @@
       ;;(format *error-output* "~&; emitting ~S~%" name)
       (assert (<= opcode 255))
       (assert has-position-order)
-      (emit-comment form " " name " " parameters " " opcode
-                    " " op-enc " " op-prefix " " op-map)
+      (emit-comment op-enc "	" form "	" name "	" parameters "	" opcode
+                    "	" op-prefix "	" op-map)
       (progn
         (ecase op-enc
           (:|EncEVEX|
-           (throw :skip-instruction nil))
+           (skip-instruction))
           (:|EncVEX|
-           (throw :skip-instruction nil))
+           (skip-instruction))
           (:|EncXOP|
-           (throw :skip-instruction nil))
+           (skip-instruction))
           (:|EncNormal|
            (ecase op-prefix
              ((nil)     ())
@@ -415,7 +414,10 @@
               (push #x90 opcode-prefix-bytes))
              ((:xopa)
               (push #x8f opcode-prefix-bytes)
-              (push #x0a opcode-prefix-bytes)))))
+              (push #x0a opcode-prefix-bytes))
+             ((:|ThreeDNow|)
+              ;; TODO ?
+              (skip-instruction)))))
         (let ()
           ;; (when (equal mnemonic "adc{w}	{$src, %ax|ax, $src}")
           ;;   (break))

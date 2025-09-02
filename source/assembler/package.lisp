@@ -43,6 +43,7 @@
    #:ax #:cx #:dx #:bx #:sp #:bp #:si #:di
    #:eax #:ecx #:edx #:ebx #:esp #:ebp #:esi #:edi
    #:rax #:rcx #:rdx #:rbx #:rsp #:rbp #:rsi #:rdi
+   #:st0 #:st1 #:st2 #:st3 #:st4 #:st5 #:st6 #:st7
 
    ;; these are only exported so that the output is not filled with pkg:: prefixes
    #:reg-mode/1

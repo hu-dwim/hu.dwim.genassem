@@ -42,9 +42,17 @@
                                (values index mode extra-bit))
                               (t (register-name->encoding/gr64 ,name)))))
     (:segment_reg
-     `(values (register-name->encoding/segment ,name)
-              -1 ;; TODO ?
-              ()))))
+     `(register-name->encoding/segment ,name))
+    (:|RSTi| ; ST(0)-ST(7)
+     `(register-name->encoding/2letter ,name ,expected-class #\S #\T))
+    (:vr64 ; MM0-MM7
+     `(register-name->encoding/2letter ,name ,expected-class #\M #\M))
+    (:vr128 ; XMM0-XMM15
+     `(register-name->encoding/3letter ,name ,expected-class #\X #\M #\M))
+    (:vr256 ; YMM0-YMM15
+     `(register-name->encoding/3letter ,name ,expected-class #\Y #\M #\M))
+    (:vr512 ; ZMM0-ZMM15
+     `(register-name->encoding/3letter ,name ,expected-class #\Z #\M #\M))))
 
 (define-constant +x86-registers/segment+ '(es cs ss ds fs gs) :test 'equal)
 (define-constant +x86-registers/8+  '(al  cl  dl  bl  spl bpl sil dil) :test 'equal)
@@ -66,6 +74,43 @@
 
 (defun unknown-register (name)
   (invalid-instruction-error "Invalid register name: ~S" name))
+
+(defun register-name->encoding/2letter (name class first second)
+  (declare (type symbol name))
+  (let* ((name/s (symbol-name name))
+         (len    (length name/s)))
+    (unless (and (= 3 len)
+                 (eql first (elt name/s 0))
+                 (eql second (elt name/s 1))
+                 (digit-char-p (elt name/s 2)))
+      (unexpected-register name class))
+    (aprog1
+        (- (char-code (elt name/s 2))
+           (char-code #\0))
+      (unless (<= 0 it 7)
+        (unknown-register name)))))
+
+(defun register-name->encoding/3letter (name class first second third)
+  (declare (type symbol name))
+  (let* ((name/s (symbol-name name))
+         (len    (length name/s)))
+    (unless (and (<= 4 len 5)
+                 (eql first (elt name/s 0))
+                 (eql second (elt name/s 1))
+                 (eql third (elt name/s 2))
+                 (digit-char-p (elt name/s 3))
+                 (or (< len 5)
+                     (digit-char-p (elt name/s 4))))
+      (unexpected-register name class))
+    (let ((index (- (char-code (elt name/s 3))
+                    (char-code #\0))))
+      (when (< 4 len)
+        (setf index (* index 10))
+        (incf index (- (char-code (elt name/s 4))
+                       (char-code #\0))))
+      (unless (<= 0 index 15)
+        (unknown-register name))
+      index)))
 
 (defun register-name->encoding/segment (name)
   (declare (type symbol name))
