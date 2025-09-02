@@ -21,10 +21,8 @@
 
 (defmacro decode-register (name expected-class)
   (ecase expected-class
-    (:gr8  `(register-name->encoding/gr8  ,name))
-    (:gr16 `(register-name->encoding/gr16 ,name))
-    (:gr32 `(register-name->encoding/gr32 ,name))
     (:gr64 `(register-name->encoding/gr64 ,name))
+    (:gr32 `(register-name->encoding/gr32 ,name))
     (:|GR32orGR64| `(multiple-value-bind (index mode extra-bit)
                         (register-name->encoding/gr32 ,name nil)
                       (if index
@@ -41,18 +39,24 @@
                                  index)
                                (values index mode extra-bit))
                               (t (register-name->encoding/gr64 ,name)))))
-    (:segment_reg
-     `(register-name->encoding/segment ,name))
-    (:|RSTi| ; ST(0)-ST(7)
-     `(register-name->encoding/2letter ,name ,expected-class #\S #\T))
-    (:vr64 ; MM0-MM7
-     `(register-name->encoding/2letter ,name ,expected-class #\M #\M))
-    (:vr128 ; XMM0-XMM15
-     `(register-name->encoding/3letter ,name ,expected-class #\X #\M #\M))
-    (:vr256 ; YMM0-YMM15
+    (:gr16 `(register-name->encoding/gr16 ,name))
+    (:gr8  `(register-name->encoding/gr8  ,name))
+    (:vr512 ;; ZMM0-ZMM15
+     `(register-name->encoding/3letter ,name ,expected-class #\Z #\M #\M))
+    (:vr256 ;; YMM0-YMM15
      `(register-name->encoding/3letter ,name ,expected-class #\Y #\M #\M))
-    (:vr512 ; ZMM0-ZMM15
-     `(register-name->encoding/3letter ,name ,expected-class #\Z #\M #\M))))
+    ((:vr128 :fr32 :fr64) ;; XMM0-XMM15
+     `(register-name->encoding/3letter ,name ,expected-class #\X #\M #\M))
+    (:vr64 ;; MM0-MM7
+     `(register-name->encoding/2letter ,name ,expected-class #\M #\M))
+    (:control_reg ;; CR0-CR7
+     `(register-name->encoding/2letter ,name ,expected-class #\C #\R))
+    (:debug_reg ;; DR0-DR7
+     `(register-name->encoding/2letter ,name ,expected-class #\D #\R))
+    (:|RSTi| ;; ST0-ST7
+     `(register-name->encoding/2letter ,name ,expected-class #\S #\T))
+    (:segment_reg
+     `(register-name->encoding/segment ,name))))
 
 (define-constant +x86-registers/segment+ '(es cs ss ds fs gs) :test 'equal)
 (define-constant +x86-registers/8+  '(al  cl  dl  bl  spl bpl sil dil) :test 'equal)

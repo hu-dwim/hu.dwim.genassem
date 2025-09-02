@@ -84,6 +84,7 @@
      (:module "x86"
       :components
       ((:file "simple")
+       (:file "infra")
        (:file "x87")
-       (:file "infra"))
+       (:file "sse"))
       :depends-on ("package" "suite"))))))

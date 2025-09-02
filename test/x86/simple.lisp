@@ -46,6 +46,16 @@
 ")
      )))
 
+(deftest form/raw/calls ()
+  (compare-with-external-assembler/x86
+   '(((bits 64)
+      (_call64pcrel32 #x11223344)
+      (_call64pcrel32 #x-11223344)
+      "00000000  E844332211        call 0x11223349
+00000005  E8BCCCDDEE        call 0xffffffffeeddccc6
+")
+     )))
+
 (deftest form/immediate ()
   (compare-with-external-assembler/x86
    '(((bits 64)

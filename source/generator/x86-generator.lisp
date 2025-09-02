@@ -71,7 +71,7 @@
             :|GR32orGR64|
             :|GR16orGR32orGR64|
             :vr64
-            :vr128
+            :vr128 :fr32 :fr64
             :vr256
             :vr512
             :|RSTi|
@@ -166,10 +166,12 @@
                         (:|u8imm|
                          `(emit-forms/imm ,-name- 8 nil))
                         ((:|i16imm|
+                          :|i16imm_brtarget|
                           )
                          `(emit-forms/imm ,-name- 16))
                         ((:|i32imm|
                           :|i64i32imm|
+                          :|i32imm_brtarget|
                           :|i64i32imm_brtarget|
                           )
                          `(emit-forms/imm ,-name- 32))
@@ -366,7 +368,7 @@
 
 (defun generate-x86-instruction-emitter (instr)
   (catch :skip-instruction
-    (bind (((&key name parameters form  ;mnemonic
+    (bind (((&key name parameters form predicates
                   opcode op-enc op-map has-rex.w
                   op-prefix             ;op-prefix/explicit
                   form-category has-position-order
@@ -376,6 +378,10 @@
            (opcode-prefix-bytes ())
            (rex (when has-rex.w
                   (logior #x40 rex.w))))
+      (unless (null (intersection '(:|HasSSE4A| ; irrelevant AMD-only extension
+                                    )
+                                  predicates))
+        (skip-instruction))
       ;;(format *error-output* "~&; emitting ~S~%" name)
       (assert (<= opcode 255))
       (assert has-position-order)
@@ -483,29 +489,29 @@
         (let ((predicate-blacklist
                 '(:|Mode16|
                   :|Not64BitMode|
-                  :|UseSSE1|
-                  :|UseSSE2|
-                  :|UseSSE3|
-                  :|UseSSE41|
-                  :|UseSSE42|
-                  :|HasSSEPrefetch|
-                  :|UseAVX|
-                  :|HasAVX|
-                  :|HasAVX2|
-                  :|HasAVX512|
-                  :|HasF16C| ; SSE; half-precision (16-bit) fp -> single-precision (32-bit) fp
-                  :|HasRTM|
-                  :|HasTSXLDTRK|
-                  :|HasWBNOINVD|
-                  :|HasAMXTILE|
-                  :|HasAMXMOVRS|
-                  :|HasAMXTRANSPOSE|
-                  :|HasAMXCOMPLEX|
-                  :|HasMOVRS|
-                  :|HasPCLMUL|
-                  :|HasTBM|
-                  :|HasCLDEMOTE|
-                  :|HasUINTR|
+                  ;; :|UseSSE1|
+                  ;; :|UseSSE2|
+                  ;; :|UseSSE3|
+                  ;; :|UseSSE41|
+                  ;; :|UseSSE42|
+                  ;; :|HasSSEPrefetch|
+                  ;; :|UseAVX|
+                  ;; :|HasAVX|
+                  ;; :|HasAVX2|
+                  ;; :|HasAVX512|
+                  ;; :|HasF16C| ; SSE; half-precision (16-bit) fp -> single-precision (32-bit) fp
+                  ;; :|HasRTM|
+                  ;; :|HasTSXLDTRK|
+                  ;; :|HasWBNOINVD|
+                  ;; :|HasAMXTILE|
+                  ;; :|HasAMXMOVRS|
+                  ;; :|HasAMXTRANSPOSE|
+                  ;; :|HasAMXCOMPLEX|
+                  ;; :|HasMOVRS|
+                  ;; :|HasPCLMUL|
+                  ;; :|HasTBM|
+                  ;; :|HasCLDEMOTE|
+                  ;; :|HasUINTR|
                   ))
               (instr-counter 0)
               (emit-counter 0)

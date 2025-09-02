@@ -247,20 +247,12 @@
   (and (not (ends-with-subseq "_PREFIX" (json-value obj "!name")))
        (asm-string obj)
        (not (pseudo-instruction?  obj))
-       (has-encoding? obj)
-       (let* ((tsflags (json-value obj "TSFlags"))
-              (vector-flags (subseq tsflags 40)))
-         ;; for now skip all the "fancy" instructions
-         (every 'zerop vector-flags))))
+       (has-encoding? obj)))
 
 ;; called on the normalized plist form
 (defun include-instruction? (obj)
-  ;; (:|HasCMOV| :|HasX87| :|HasMMX|
-  ;;  :|HasAES| :|NoAVX| :|HasBMI| :|HasSSE4A|
-  ;;  :|HasDQI| :|HasBWI| :|HasKL| :|UseSSSE3|)
-  (null (intersection '(:|HasSSE4A|     ; AMD only extension
-                        )
-                      (getf obj :predicates))))
+  (declare (ignore obj))
+  t)
 
 (defun process-tablegen-json (stream visitor &key (normalize? t))
   (jzon:with-parser (parser stream)
