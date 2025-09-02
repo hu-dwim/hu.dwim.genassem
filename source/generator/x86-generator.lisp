@@ -273,18 +273,19 @@
 ;;;
 ;;; MRMDestReg
 ;;;
-        ((or (equal form-str "MRMDestReg")
-             (equal form-str "MRMSrcReg"))
+        ((equal form-str "MRMSrcReg")
+         ;; source:      mrm.reg, rex.r
+         ;; destination: mrm.r/m, rex.b
          (setf (ldb (byte 2 6) modrm) #b11)
-         (let ((segment-reg
-                 (pop-reg-param! parameters 'segment-register-type?)))
-           (when segment-reg
-             ;; ...then we need to make sure the segment register is
-             ;; in src for te right encoding. this is somwhat kludgey.
-             (setf src-reg-param segment-reg))
-           (setf dst-reg-param (pop-reg-param! parameters))
-           (unless src-reg-param
-             (setf src-reg-param (pop-reg-param! parameters)))))
+         (setf dst-reg-param (pop-reg-param! parameters))
+         (setf src-reg-param (pop-reg-param! parameters)))
+
+        ((equal form-str "MRMDestReg")
+         ;; source:      mrm.r/m, rex.b
+         ;; destination: mrm.reg, rex.r
+         (setf (ldb (byte 2 6) modrm) #b11)
+         (setf src-reg-param (pop-reg-param! parameters))
+         (setf dst-reg-param (pop-reg-param! parameters)))
 
         (t
          ;; TODO
@@ -292,12 +293,6 @@
          ;; (error "Unexpected MRM form value: ~S" form)
          ))
       (assert dst-reg-param)
-      (when (intersection (list (cdr dst-reg-param) (cdr src-reg-param))
-                          '(:control_reg
-                            ;;:segment_reg
-                            :debug_reg))
-        ;; TODO
-        (skip-instruction))
       (prog1
           `(define-instruction ,name ,(mapcar 'car (getf instr :parameters))
              (multiple-value-bind (reg-index/1 reg-mode/1 reg-extra-bit/1)
@@ -321,9 +316,9 @@
                         ''((maybe-emit-operand-size-prefix)))
                    (emit-bytes ',',opcode-prefix-bytes)
                    (emit-byte ',',opcode)
-                   (emit-byte ',(logior ',modrm reg-index/1
+                   (emit-byte ',(logior ',modrm reg-index/1 ; modrm.r/m
                                         ,@(when src-reg-param
-                                            `((ash reg-index/2 3)))))
+                                            `((ash reg-index/2 3))))) ; modrm.reg
                    ;; TODO copy-paste from above
                    ,@,(append
                        '(list)

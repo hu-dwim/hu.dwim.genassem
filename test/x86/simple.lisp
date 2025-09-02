@@ -112,19 +112,24 @@
       "00000000  66BB2211          mov bx,0x1122
 "))))
 
-(deftest form/mrm/srcreg ()
+(deftest form/mrm/special-registers ()
   (compare-with-external-assembler/x86
    '(((bits 64)
-      (_adcx32rr ebx eax)
-      (_adcx64rr rcx r10)
-      "00000000  660F38F6C3        adcx eax,ebx
-00000005  664C0F38F6D1      adcx r10,rcx
+      (_mov64cr rcx cr3)
+      (_mov64cr rdx cr7)
+      (_mov64cr rax cr0)
+      (_mov64rc cr0 r15)
+      (_mov64rc cr1 r11)
+      "00000000  480F22D9          mov cr3,rcx
+00000004  480F22FA          mov cr7,rdx
+00000008  480F22C0          mov cr0,rax
+0000000C  490F20C7          mov r15,cr0
+00000010  490F20CB          mov r11,cr1
 "))))
 
 (deftest form/mrm ()
   (compare-with-external-assembler/x86
    '(((bits 64)
-      (_adc16rr bx ax)
       (_adc16ri #x1122 ax)
       (_adc64ri32 #x11223344 rax)
       (_adc64ri8 #x11 rbx)
@@ -135,18 +140,72 @@
       (_test8i8 #x11)    ; same as next, but special encoding
       (_test8ri #x11 al)
       (_test8ri #x11 bl)
-      "00000000  6611C3            adc bx,ax
-00000003  6681D02211        adc ax,0x1122
-00000008  4881D044332211    adc rax,0x11223344
-0000000F  4883D311          adc rbx,byte +0x11
-00000013  4983D711          adc r15,byte +0x11
-00000017  4883D611          adc rsi,byte +0x11
-0000001B  660FAEF1          tpause ecx
-0000001F  660FAEF2          tpause edx
-00000023  A811              test al,0x11
-00000025  F6C011            test al,0x11
-00000028  F6C311            test bl,0x11
+      "00000000  6681D02211        adc ax,0x1122
+00000005  4881D044332211    adc rax,0x11223344
+0000000C  4883D311          adc rbx,byte +0x11
+00000010  4983D711          adc r15,byte +0x11
+00000014  4883D611          adc rsi,byte +0x11
+00000018  660FAEF1          tpause ecx
+0000001C  660FAEF2          tpause edx
+00000020  A811              test al,0x11
+00000022  F6C011            test al,0x11
+00000025  F6C311            test bl,0x11
+")
+     )))
+
+(deftest form/mrm/srcreg ()
+  (compare-with-external-assembler/x86
+   '(((bits 64)
+      (_adc8rr     bl dl)
+      (_adcx32rr   ebx eax)
+      (_adcx64rr   rcx r10)
+      (_add16rr    dx ax)
+      (_addpdrr    xmm0 xmm1)
+      (_addsubpdrr xmm4 xmm7)
+      (_adox64rr   r8 rax)
+      (_blendpdrri #x11 xmm1 xmm2)
+      "00000000  10DA              adc dl,bl
+00000002  660F38F6C3        adcx eax,ebx
+00000007  664C0F38F6D1      adcx r10,rcx
+0000000D  6601D0            add ax,dx
+00000010  660F58C8          addpd xmm1,xmm0
+00000014  660FD0FC          addsubpd xmm7,xmm4
+00000018  F3490F38F6C0      adox rax,r8
+0000001E  660F3A0DD111      blendpd xmm2,xmm1,byte 0x11
 "))))
+
+(deftest form/mrm/destreg ()
+  (compare-with-external-assembler/x86
+   '(((bits 64)
+      (_adc16rr bx ax)
+      (_mov64rr rax rbx)
+      (_mov64rr rax r15)
+      (_mov64rr r8 r14)
+      (_extractpsrri #x11 xmm7 eax)
+      (_extractpsrri #x11 xmm7 r15)
+      (_pextrbrri    #x11 xmm0 ebx)
+      (_pextrbrri    #x11 xmm7 ebx)
+      "00000000  6611D8            adc ax,bx
+00000003  4889C3            mov rbx,rax
+00000006  4989C7            mov r15,rax
+00000009  4D89C6            mov r14,r8
+0000000C  660F3A17F811      extractps eax,xmm7,byte 0x11
+00000012  66490F3A17FF11    extractps r15d,xmm7,byte 0x11
+00000019  660F3A14C311      pextrb ebx,xmm0,byte 0x11
+0000001F  660F3A14FB11      pextrb ebx,xmm7,byte 0x11
+")
+     )))
+
+(deftest form/mrm/destreg/bug/1 ()
+  (with-expected-failures
+    (compare-with-external-assembler/x86
+     '(((bits 64)
+        (_pextrbrri    #x11 xmm0 rbx)
+        (_pextrbrri    #x11 xmm15 ebx)
+        "00000000  ?    pextrb ebx,xmm0,byte 0x11
+00000007  ?      pextrb ebx,xmm7,byte 0x11
+")
+       ))))
 
 ;; TODO
 ;; (deftest form/mrm/vex ()
