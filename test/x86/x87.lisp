@@ -9,7 +9,7 @@
 (defsuite* (x87 :in test))
 
 (deftest x87/mrm/1 ()
-  (test-using-external-assembler
+  (compare-with-external-assembler/x86
    '(((bits 64)
       (_mul_fprst0 st3)
       (_subr_fprst0 st7)

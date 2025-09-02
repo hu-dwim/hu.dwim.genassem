@@ -6,51 +6,10 @@
 
 (in-package :hu.dwim.genassem/x86.test)
 
-(in-suite test)
-
-(defun disasm-output/stdin (cmdline asm-context)
-  (uiop:run-program
-   cmdline
-   :external-format :iso-8859-1
-   :input (make-string-input-stream
-           (babel:octets-to-string
-            (buffer-of asm-context)
-            :encoding :iso-8859-1))
-   :output :string
-   :error-output :string))
-
-(defun disasm-output/tmp-file (cmdline asm-context)
-  (check-type cmdline list)
-  (uiop:with-temporary-file (:stream stream :pathname path
-                             :element-type '(unsigned-byte 8))
-    (write-sequence (buffer-of asm-context) stream)
-    (finish-output stream)
-    (uiop:run-program
-     (append cmdline (list (namestring path)))
-     :output :string
-     :error-output :string)))
-
-(defun ndisasm-output (asm-context)
-  (disasm-output/stdin '("ndisasm" "-b" "64" "-p" "intel" "-") asm-context))
-
-(defun xed-output (asm-context)
-  (disasm-output/tmp-file '("xed" "-64" "-ir") asm-context))
-
-(defun zydis-output (asm-context)
-  (disasm-output/tmp-file '("ZydisDisasm""-64") asm-context))
-
-(defun test-using-external-assembler (forms)
-  (loop :for entry :in forms
-        :for instrs = (butlast entry)
-        :for expected = (car (last entry))
-        :for session = (eval `(with-asm () ,@instrs))
-        :do (is (equal expected (ndisasm-output session)))
-            ;; :do (print (xed-output context))
-            ;; :do (print (zydis-output context))
-        ))
+(defsuite* (simple :in test))
 
 (deftest form/raw ()
-  (test-using-external-assembler
+  (compare-with-external-assembler/x86
    '(((bits 64)
       (_ret64)
       (_hlt)
@@ -88,7 +47,7 @@
      )))
 
 (deftest form/immediate ()
-  (test-using-external-assembler
+  (compare-with-external-assembler/x86
    '(((bits 64)
       (_cmp8i8   #x12)
       (_cmp16i16 #x1122)
@@ -125,7 +84,7 @@
 "))))
 
 (deftest form/add-reg ()
-  (test-using-external-assembler
+  (compare-with-external-assembler/x86
    '(((bits 64)
       (_bswap32r edx)
       (_bswap64r rbx)
@@ -144,7 +103,7 @@
 "))))
 
 (deftest form/mrm/srcreg ()
-  (test-using-external-assembler
+  (compare-with-external-assembler/x86
    '(((bits 64)
       (_adcx32rr ebx eax)
       (_adcx64rr rcx r10)
@@ -153,7 +112,7 @@
 "))))
 
 (deftest form/mrm ()
-  (test-using-external-assembler
+  (compare-with-external-assembler/x86
    '(((bits 64)
       (_adc16rr bx ax)
       (_adc16ri #x1122 ax)
@@ -181,14 +140,14 @@
 
 ;; TODO
 ;; (deftest form/mrm/vex ()
-;;   (test-using-external-assembler
+;;   (compare-with-external-assembler/x86
 ;;    '(((bits 64)
 ;;       (_blsi32rr edx ebx)
 ;;       "00000000  C4E260F3DA        blsi ebx,edx
 ;; "))))
 
 (deftest form/mrm/segment ()
-  (test-using-external-assembler
+  (compare-with-external-assembler/x86
    '(((bits 64)
       (_mov16rs fs cx)
       (_mov16rs gs bx)

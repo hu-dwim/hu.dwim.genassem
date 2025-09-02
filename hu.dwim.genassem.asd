@@ -76,9 +76,14 @@
   ;; inspected in Slime), so we at least print it.
   :perform (test-op (o c) (print (funcall (intern (string '#:test)
                                                   (find-package :hu.dwim.genassem/x86.test)))))
-  :components ((:module "test"
-                :components ((:file "package")
-                             (:file "suite" :depends-on ("package"))
-                             (:file "simple" :depends-on ("package" "suite"))
-                             (:file "infra" :depends-on ("package" "suite"))
-                             ))))
+  :components
+  ((:module "test"
+    :components
+    ((:file "package")
+     (:file "suite" :depends-on ("package"))
+     (:module "x86"
+      :components
+      ((:file "simple")
+       (:file "x87")
+       (:file "infra"))
+      :depends-on ("package" "suite"))))))
