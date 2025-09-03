@@ -21,6 +21,7 @@
    #:assembler-error
    #:simple-assembler-error
    #:invalid-instruction-error
+   #:invalid-operand-error
    ))
 
 (uiop:define-package :hu.dwim.genassem/x86

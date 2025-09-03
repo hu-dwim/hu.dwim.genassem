@@ -53,12 +53,25 @@
 
 (define-condition invalid-instruction-error
     (simple-assembler-error)
-  ((instruction :accessor instruction-of :initarg :instruction)))
+  ((instruction :accessor instruction-of :initarg :instruction
+                :initform (when (boundp '*current-instruction*)
+                            *current-instruction*))
+   (execution-mode :accessor execution-mode-of :initarg :execution-mode
+                   :initform (when (boundp '*asm-context*)
+                               (current-execution-mode)))))
 
 (defun invalid-instruction-error (&optional format &rest args)
   (signal 'invalid-instruction-error
-          :instruction (when (boundp '*current-instruction*)
-                         *current-instruction*)
+          :format-control format
+          :format-arguments args))
+
+(define-condition invalid-operand-error
+    (invalid-instruction-error)
+  ((operand :accessor operand-of :initarg :operand)))
+
+(defun invalid-operand-error (operand &optional format &rest args)
+  (signal 'invalid-operand-error
+          :operand operand
           :format-control format
           :format-arguments args))
 
