@@ -118,6 +118,8 @@
         (set-field :op-map value))
 
       (let ((value (json/def-like-value obj "OpPrefix")))
+        ;; TODO maybe NoPrfx should be retained because it may mean
+        ;; that no prefix in any case.
         (unless (eq value :|NoPrfx|)
           (set-field :op-prefix value)))
 

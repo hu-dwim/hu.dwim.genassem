@@ -23,11 +23,16 @@
   (ecase expected-class
     (:gr64 `(register-name->encoding/gr64 ,name))
     (:gr32 `(register-name->encoding/gr32 ,name))
-    (:|GR32orGR64| `(multiple-value-bind (index mode extra-bit)
-                        (register-name->encoding/gr32 ,name nil)
-                      (if index
-                          (values index mode extra-bit)
-                          (register-name->encoding/gr64 ,name))))
+    (:|GR32orGR64|
+     ;; GR32orGR64 means: this slot could be a 32-bit or a 64-bit
+     ;; general register, depending on prefixes. In 32-bit mode, it’s
+     ;; fixed to 32-bit. In 64-bit mode, the assembler decides:
+     ;; without REX.W, use 32-bit; with REX.W, use 64-bit.
+     `(multiple-value-bind (index mode extra-bit)
+          (register-name->encoding/gr32 ,name nil)
+        (if index
+            (values index mode extra-bit)
+            (register-name->encoding/gr64 ,name))))
     (:|GR16orGR32orGR64| `(multiple-value-bind (index mode extra-bit)
                               (register-name->encoding/gr16 ,name nil)
                             (cond

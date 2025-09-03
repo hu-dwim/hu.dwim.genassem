@@ -24,6 +24,21 @@ writing code that switches execution mode...?
 
 must use a symbol-macrolet and access it through macroexpand-1 on the
 &environment to retrieve it.
+** architectural headache around staging computation; add a functional interface
+sometimes DECODE-REGISTER wants to dispatch on the
+CURRENT-EXECUTION-MODE (GR32orGR64 operand types), but that is only
+available at runtime.
+
+moving the D-R call into the expansion would be a costy code reorg.
+
+consider using a small partial-eval and constructing the entire
+instruction emit form and let the p-e deal with all this.
+
+this is related to adding a functional interface where the register
+name is passed as a function argument at runtime.
+* features
+** partition instructions by microarchitecture levels?
+or maybe add the predicates to the asm-context for runtime checks?
 * knowledge base
 ** x86
 https://www.felixcloutier.com/x86/nop
@@ -54,7 +69,7 @@ https://en.wikipedia.org/wiki/X86-64#Microarchitecture_levels
 x87 FPU stack (mostly obsolete):
  - 8 registers: ST(0)–ST(7)
  - 80-bit internally, addressable as 32/64/80 bits depending on instruction.
- - Mostly legacy
+ - Mostly legacy by now
 
 MMX registers (Obsolete, replaced by XMM/YMM/ZMM.):
  - MM0–MM7 (64-bit)
@@ -69,12 +84,12 @@ SSE / AVX:
 Mask registers (AVX-512):
  - K0–K7 (or K0–K31 with EVEX) — 64-bit masks used for predication.
 
-Control Registers:
+Control Registers (control_reg):
  - CR0, CR2, CR3, CR4, CR8 (64-bit mode).
  - CR1, CR5–CR7 are reserved/unused.
  - Used for paging, system control, etc.
 
-Debug Registers:
+Debug Registers (debug_reg):
  - DR0–DR7, DR8–DR15 (depending on CPU).
  - Used for hardware breakpoints, debugging.
 
@@ -125,10 +140,10 @@ Special rule:
 Emit this when using 64-bit operands or registers R8–R15.
 
 REX:  0 1 0 0 W R X B (0x4_)
-REX.W changes the operand size to 64 bits
-REX.R extra 4th bit of reg
-REX.B expands r/m (or opreg in the few opcodes that encode the register in the 3 lowest opcode bits, such as "POP reg")
-REX.X and B expand index and base in the SIB byte
+0 REX.B 4th bit of modrm.r/m (or opreg in the few opcodes that encode the register in the 3 lowest opcode bits, such as "POP reg")
+1 REX.X and B expand index and base in the SIB byte
+2 REX.R 4th bit of modrm.reg
+3 REX.W changes the operand size to 64 bits
 
 REX2: 0xD5
       M0 R4 X4 B4 W R3 X3 B3

@@ -184,7 +184,7 @@
       (_extractpsrri #x11 xmm7 eax)
       (_extractpsrri #x11 xmm7 r15)
       (_pextrbrri    #x11 xmm0 ebx)
-      (_pextrbrri    #x11 xmm7 ebx)
+      (_pextrbrri    #x11 xmm7 edx)
       "00000000  6611D8            adc ax,bx
 00000003  4889C3            mov rbx,rax
 00000006  4989C7            mov r15,rax
@@ -192,7 +192,7 @@
 0000000C  660F3A17F811      extractps eax,xmm7,byte 0x11
 00000012  66490F3A17FF11    extractps r15d,xmm7,byte 0x11
 00000019  660F3A14C311      pextrb ebx,xmm0,byte 0x11
-0000001F  660F3A14FB11      pextrb ebx,xmm7,byte 0x11
+0000001F  660F3A14FA11      pextrb edx,xmm7,byte 0x11
 ")
      )))
 
@@ -200,10 +200,19 @@
   (with-expected-failures
     (compare-with-external-assembler/x86
      '(((bits 64)
+        ;; this is an architectural headache without a trivial fix:
+        ;; DECODE-REGISTER happens at macroexpand-time, but with the
+        ;; :|GR32orGR64| operand type it would need to dispatch on the
+        ;; execution mode, which is only available at runtime in the
+        ;; current setup.  this is also related to being able to
+        ;; generate a functional interface where there's no
+        ;; macroexpand time.
         (_pextrbrri    #x11 xmm0 rbx)
         (_pextrbrri    #x11 xmm15 ebx)
-        "00000000  ?    pextrb ebx,xmm0,byte 0x11
-00000007  ?      pextrb ebx,xmm7,byte 0x11
+        ;; TODO test whether (_pextrbrri #x11 xmm0 rbx) signals and
+        ;; error in 32bit mode.
+        "00000000  zork 66480F3A14C311    pextrb rbx,xmm0,byte 0x11
+00000007  zork 660F3A14FB11      pextrb ebx,xmm7,byte 0x11
 ")
        ))))
 

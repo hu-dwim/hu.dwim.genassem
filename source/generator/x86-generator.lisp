@@ -223,6 +223,7 @@
                             :|offset64_16|
                             :|offset64_32|
                             :|offset64_64|)
+                           ;; these are de facto obsolete, let's just skip them...
                            (skip-instruction))
                           (:|u8imm|
                            `(emit-forms/imm ,-name- 8 nil))
@@ -245,16 +246,16 @@
            (form-length (length form-str))
            (dst-reg-param nil)
            (src-reg-param nil))
-;; +---+---+---+---+---+---+---+---+
-;; |   mod  |  reg/opcode |  r/m   |
-;; +---+---+---+---+---+---+---+---+
-;;   7   6     5   4   3     2   1 0
-;;
-;; - mod (2 bits): addressing mode (register, memory, disp8, disp32, etc.)
-;; - reg/opcode (3 bits):
-;;   Normally selects a register operand,
-;;   but in some opcodes, it’s treated as an opcode extension.
-;; - r/m (3 bits): register or memory operand (sometimes extended with SIB if r/m=100).
+;;; +---+---+---+---+---+---+---+---+
+;;; |   mod  |  reg/opcode |  r/m   |
+;;; +---+---+---+---+---+---+---+---+
+;;;   7   6     5   4   3     2   1 0
+;;;
+;;; - mod (2 bits): addressing mode (register, memory, disp8, disp32, etc.)
+;;; - reg/opcode (3 bits):
+;;;   Normally selects a register operand,
+;;;   but in some opcodes, it’s treated as an opcode extension.
+;;; - r/m (3 bits): register or memory operand (sometimes extended with SIB if r/m=100).
 
       (cond
 ;;;
