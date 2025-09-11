@@ -16,8 +16,40 @@
     (emit-byte #x66)))
 
 ;;;
-;;; Register lookup/decode
+;;; Generic registers
 ;;;
+(define-register-instances gr8  (al  cl  dl  bl  spl bpl sil dil r8b r9b r10b r11b r12b r13b r14b r15b))
+(define-register-instances gr16 (ax  cx  dx  bx  sp  bp  si  di  r8w r9w r10w r11w r12w r13w r14w r15w))
+(define-register-instances gr32 (eax ecx edx ebx esp ebp esi edi r8d r9d r10d r11d r12d r13d r14d r15d))
+(define-register-instances gr64 (rax rcx rdx rbx rsp rbp rsi rdi r8  r9  r10  r11  r12  r13  r14  r15 ))
+
+;;;
+;;; Float, x87, ST(0)-ST(7) registers
+;;;
+(define-register-instances/numbered st #:st 8)
+
+;;;
+;;; Vector registers
+;;;
+(define-register-instances/numbered vr64  #:mm  8)
+(define-register-instances/numbered vr128 #:xmm 16)
+(define-register-instances/numbered vr256 #:ymm 16)
+(define-register-instances/numbered vr512 #:zmm 16)
+
+;;;
+;;; Segment registers
+;;;
+(define-register-instances sr (es cs ss ds fs gs))
+
+;;;
+;;; Control registers
+;;;
+(define-register-instances/numbered cr #:cr 8)
+
+;;;
+;;; Debug registers
+;;;
+(define-register-instances/numbered dr #:dr 8)
 
 (defmacro decode-register (name expected-class)
   (ecase expected-class
@@ -44,196 +76,72 @@
                                  index)
                                (values index mode extra-bit))
                               (t (register-name->encoding/gr64 ,name)))))
-    (:gr16 `(register-name->encoding/gr16 ,name))
-    (:gr8  `(register-name->encoding/gr8  ,name))
-    (:vr512 ;; ZMM0-ZMM15
-     `(register-name->encoding/3letter ,name ,expected-class #\Z #\M #\M))
-    (:vr256 ;; YMM0-YMM15
-     `(register-name->encoding/3letter ,name ,expected-class #\Y #\M #\M))
-    ((:vr128 :fr32 :fr64) ;; XMM0-XMM15
-     `(register-name->encoding/3letter ,name ,expected-class #\X #\M #\M))
-    (:vr64 ;; MM0-MM7
-     `(register-name->encoding/2letter ,name ,expected-class #\M #\M))
-    (:control_reg ;; CR0-CR7
-     `(register-name->encoding/2letter ,name ,expected-class #\C #\R))
-    (:debug_reg ;; DR0-DR7
-     `(register-name->encoding/2letter ,name ,expected-class #\D #\R))
-    (:|RSTi| ;; ST0-ST7
-     `(register-name->encoding/2letter ,name ,expected-class #\S #\T))
-    (:segment_reg
-     `(register-name->encoding/segment ,name))))
-
-(define-constant +x86-registers/segment+ '(es cs ss ds fs gs) :test 'equal)
-(define-constant +x86-registers/8+  '(al  cl  dl  bl  spl bpl sil dil) :test 'equal)
-(define-constant +x86-registers/16+ '(ax  cx  dx  bx  sp  bp  si  di)  :test 'equal)
-(define-constant +x86-registers/32+ '(eax ecx edx ebx esp ebp esi edi) :test 'equal)
-(define-constant +x86-registers/64+ '(rax rcx rdx rbx rsp rbp rsi rdi) :test 'equal)
-
-(declaim (inline register-index))
-(defun register-index (name registers &optional (default nil default?))
-  (declare (type symbol name))
-  (or (position name registers :test 'eq)
-      (if default?
-          default
-          (error "Unexpected register name: ~S" name))))
+    (:gr16        `(register-name->encoding/gr16 ,name))
+    (:gr8         `(register-name->encoding/gr8  ,name))
+    ;; FIXME the next 3 also needs to extract the extra-bit
+    (:vr512       `(vr512-index (vr512 ,name))) ; ZMM0-ZMM15
+    (:vr256       `(vr256-index (vr256 ,name))) ; YMM0-YMM15
+    ((:vr128 :fr32 :fr64) `(vr128-index (vr128 ,name))) ; XMM0-XMM15
+    (:vr64        `(vr64-index (vr64 ,name))) ; MM0-MM7
+    (:control_reg `(cr-index (cr ,name))) ; CR0-CR7
+    (:debug_reg   `(dr-index (dr ,name))) ; DR0-DR7
+    (:|RSTi|      `(st-index (st ,name))) ; ST0-ST7
+    (:segment_reg `(sr-index (sr ,name)))))
 
 (defun unexpected-register (name expected-class)
   (invalid-instruction-error
-   "Trying to use register ~S while expecting a ~S" name expected-class))
+   "Trying to use register ~A while expecting a ~S"
+   (fully-qualified-symbol-name name) expected-class))
 
 (defun unknown-register (name)
-  (invalid-instruction-error "Invalid register name: ~S" name))
-
-(defun register-name->encoding/2letter (name class first second)
-  (declare (type symbol name))
-  (let* ((name/s (symbol-name name))
-         (len    (length name/s)))
-    (unless (and (= 3 len)
-                 (eql first (elt name/s 0))
-                 (eql second (elt name/s 1))
-                 (digit-char-p (elt name/s 2)))
-      (unexpected-register name class))
-    (aprog1
-        (- (char-code (elt name/s 2))
-           (char-code #\0))
-      (unless (<= 0 it 7)
-        (unknown-register name)))))
-
-(defun register-name->encoding/3letter (name class first second third)
-  (declare (type symbol name))
-  (let* ((name/s (symbol-name name))
-         (len    (length name/s)))
-    (unless (and (<= 4 len 5)
-                 (eql first (elt name/s 0))
-                 (eql second (elt name/s 1))
-                 (eql third (elt name/s 2))
-                 (digit-char-p (elt name/s 3))
-                 (or (< len 5)
-                     (digit-char-p (elt name/s 4))))
-      (unexpected-register name class))
-    (let ((index (- (char-code (elt name/s 3))
-                    (char-code #\0))))
-      (when (< 4 len)
-        (setf index (* index 10))
-        (incf index (- (char-code (elt name/s 4))
-                       (char-code #\0))))
-      (unless (<= 0 index 15)
-        (unknown-register name))
-      index)))
-
-(defun register-name->encoding/segment (name)
-  (declare (type symbol name))
-  (register-index name +x86-registers/segment+))
-
-(defun register-name->encoding/r-numbered (name expected-class)
-  "Returns (values reg-index reg-mode reg-extra-bit)."
-  (declare (type symbol name)
-           (type (member :gr8 :gr16 :gr32 :gr64
-                         :|GR32orGR64| :|GR16orGR32orGR64|)
-                 expected-class))
-  (let* ((name/s (symbol-name name))
-         (len    (length name/s))
-         (first-char (elt name/s 0))
-         (last-char  (elt name/s (1- len))))
-    (when (or (not (eql first-char #\R))
-              (register-index name +x86-registers/64+ nil))
-      (unexpected-register name expected-class))
-    (unless (digit-char-p (elt name/s 1))
-      (unknown-register name))
-    (let ((index (- (char-code (elt name/s 1))
-                    (char-code #\0)))
-          (class 64))
-      (case last-char
-        (#\D
-         (unless (member expected-class
-                         '(:gr32 :|GR32orGR64| :|GR16orGR32orGR64|)
-                         :test 'eq)
-           (unexpected-register name expected-class))
-         (setf class 32)
-         (decf len))
-        (#\W
-         (unless (eq expected-class :gr16)
-           (unexpected-register name expected-class))
-         (setf class 16)
-         (decf len))
-        (#\B
-         (unless (eq expected-class :gr8)
-           (unexpected-register name expected-class))
-         (setf class 8)
-         (decf len)))
-      (ecase len
-        (2)
-        (3 (setf index (+ (* index 10)
-                          (- (char-code (elt name/s 2))
-                             (char-code #\0))))))
-      (unless (<= 8 index 15)
-        (unknown-register name))
-      (values (logand #b111 index) class 1))))
+  (invalid-instruction-error "Invalid register name: ~A"
+                             (fully-qualified-symbol-name name)))
 
 (defun register-name->encoding/gr8 (name &optional (otherwise nil otherwise?))
   (declare (type symbol name))
-  (let* ((name/s (symbol-name name))
-         (len    (length name/s))
-         (last-char (elt name/s (1- len))))
-    (cond
-      ((eql last-char #\L)
-       (values (register-index name +x86-registers/8+) 8 nil))
-      ((and (eql last-char #\B)
-            (eql (elt name/s 0) #\R))
-       ;; R8B..R15B
-       (register-name->encoding/r-numbered name :gr8))
-      (t
-       (if otherwise?
-           otherwise
-           (unexpected-register name :gr8))))))
+  (acond
+    ((gr8 name nil)
+     (let ((index (gr8-index it))
+           (extra-bit nil))
+       (when (< 7 index)
+         (setf extra-bit 1)
+         (decf index 8))
+       (values index 8 extra-bit)))
+    (otherwise? otherwise)
+    (t (unexpected-register name :gr8))))
 
 (defun register-name->encoding/gr16 (name &optional (otherwise nil otherwise?))
   (declare (type symbol name))
-  (let* ((name/s (symbol-name name))
-         (len    (length name/s))
-         (last-char (elt name/s (1- len))))
-    (acond
-      ((register-index name +x86-registers/16+ nil)
-       (values it 16 nil))
-      ((and (eql last-char #\W)
-            (eql (elt name/s 0) #\R))
-       ;; R8W..R15W
-       (register-name->encoding/r-numbered name :gr16))
-      (t
-       (if otherwise?
-           otherwise
-           (unexpected-register name :gr16))))))
+  (acond
+    ((gr16 name nil)
+     (let ((index (gr16-index it))
+           (extra-bit nil))
+       (when (< 7 index)
+         (setf extra-bit 1)
+         (decf index 8))
+       (values index 16 extra-bit)))
+    (otherwise? otherwise)
+    (t (unexpected-register name :gr16))))
 
 (defun register-name->encoding/gr32 (name &optional (otherwise nil otherwise?))
   (declare (type symbol name))
-  (let* ((name/s (symbol-name name))
-         (len    (length name/s))
-         (last-char (elt name/s (1- len))))
-    (acond
-      ((register-index name +x86-registers/32+ nil)
-       (values it 32 nil))
-      ((and (eql last-char #\D)
-            (eql (elt name/s 0) #\R))
-       ;; R8D..R15D
-       (register-name->encoding/r-numbered name :gr32))
-      (t
-       (if otherwise?
-           otherwise
-           (unexpected-register name :gr32))))))
+  (acond
+    ((gr32 name nil)
+     (let ((index (gr32-index it))
+           (extra-bit nil))
+       (when (< 7 index)
+         (setf extra-bit 1)
+         (decf index 8))
+       (values index 32 extra-bit)))
+    (otherwise? otherwise)
+    (t (unexpected-register name :gr32))))
 
-(defun register-name->encoding/gr64 (name &optional (otherwise nil otherwise?))
+(defun register-name->encoding/gr64 (name)
   (declare (type symbol name))
-  (let* ((name/s (symbol-name name))
-         (len    (length name/s))
-         (last-char (elt name/s (1- len))))
-    (acond
-      ((register-index name +x86-registers/64+ nil)
-       (values it 64 ()))
-      ((and (digit-char-p last-char)
-            (eql (elt name/s 0) #\R))
-       ;; R8..R15
-       (register-name->encoding/r-numbered name :gr64))
-      (t
-       (if otherwise?
-           otherwise
-           (unexpected-register name :gr64))))))
+  (let* ((reg (gr64 name))
+         (index (gr64-index reg))
+         (extra-bit nil))
+    (when (< 7 index)
+      (setf extra-bit 1)
+      (decf index 8))
+    (values index 64 extra-bit)))

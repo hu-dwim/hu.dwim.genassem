@@ -43,7 +43,8 @@
                 :components
                 ((:module "assembler"
                   :components ((:file "package")
-                               (:file "asm-common")
+                               (:file "utils" :depends-on ("package"))
+                               (:file "asm-common" :depends-on ("package" "utils"))
                                ))))))
 
 (defsystem :hu.dwim.genassem/x86
@@ -60,7 +61,8 @@
   :components ((:module "source"
                 :components
                 ((:module "assembler"
-                  :components ((:file "x86")
+                  :components ((:file "x86-early")
+                               (:file "x86" :depends-on ("x86-early"))
                                (:file "x86-instructions" :depends-on ("x86"))
                                ))))))
 
