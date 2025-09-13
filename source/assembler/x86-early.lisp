@@ -17,17 +17,41 @@
                       (every 'reg-stuff-equal a b)))
          (cons   (and (reg-stuff-equal (car a) (car b))
                       (reg-stuff-equal (cdr a) (cdr b))))
-         (structure-object
+         (standard-object
           ;; we punt...
           t))))
 
 ;;;
-;;; Register lookup/decode
+;;; Registers and their lookup/decode
 ;;;
 
-(defmacro define-register-class (name)
-  `(defstruct (,name (:constructor ,(symbolicate '#:%make- name) (index)))
-     (index 0 :type fixnum)))
+
+#+nil
+(hu.dwim.defclass-star:defclass* register ()
+  ((index :type fixnum)
+   (max-index 7 :allocation :class)))
+
+(defclass register ()
+  ((index :accessor index-of :initarg :index :type fixnum)
+   (max-index :initform 7 :accessor max-index-of :initarg :max-index
+              :allocation :class)))
+
+(defmethod print-object ((self register) *standard-output*)
+  (format t "#<~A ~A>"
+          (class-name (class-of self))
+          (if (slot-boundp self 'index)
+              (index-of self)
+              #\?)))
+
+(defclass gr (register)
+  ((max-index :allocation :class :initform 15 :accessor max-index-of)))
+
+(defclass vr (register)
+  ((max-index :allocation :class :initform 15 :accessor max-index-of)))
+
+(defmacro define-register-class (name &optional (supers '(register)) direct-slots)
+  `(defclass ,name ,supers
+     ,direct-slots))
 
 (defmacro define-register-instances (class-name names)
   (let ((constant-names ())
@@ -35,7 +59,7 @@
     `(progn
        ,@(mapcar (lambda (name index)
                    (push name constant-names)
-                   `(define-constant ,name (,(symbolicate '#:%make- class-name) ,index)
+                   `(define-constant ,name (make-instance ',class-name :index ,index)
                       :test 'reg-stuff-equal))
                  names
                  (alexandria:iota (length names)))
@@ -66,10 +90,10 @@
 ;;;
 ;;; Generic registers
 ;;;
-(define-register-class gr8)
-(define-register-class gr16)
-(define-register-class gr32)
-(define-register-class gr64)
+(define-register-class gr8  (gr))
+(define-register-class gr16 (gr))
+(define-register-class gr32 (gr))
+(define-register-class gr64 (gr))
 
 ;;;
 ;;; Float, x87, ST(0)-ST(7) registers
@@ -79,10 +103,10 @@
 ;;;
 ;;; Vector registers
 ;;;
-(define-register-class vr64)
-(define-register-class vr128)
-(define-register-class vr256)
-(define-register-class vr512)
+(define-register-class vr64  (vr))
+(define-register-class vr128 (vr))
+(define-register-class vr256 (vr))
+(define-register-class vr512 (vr))
 
 ;;;
 ;;; Segment registers

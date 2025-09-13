@@ -51,97 +51,46 @@
 ;;;
 (define-register-instances/numbered dr #:dr 8)
 
-(defmacro decode-register (name expected-class)
-  (ecase expected-class
-    (:gr64 `(register-name->encoding/gr64 ,name))
-    (:gr32 `(register-name->encoding/gr32 ,name))
-    (:|GR32orGR64|
-     ;; GR32orGR64 means: this slot could be a 32-bit or a 64-bit
-     ;; general register, depending on prefixes. In 32-bit mode, it’s
-     ;; fixed to 32-bit. In 64-bit mode, the assembler decides:
-     ;; without REX.W, use 32-bit; with REX.W, use 64-bit.
-     `(multiple-value-bind (index mode extra-bit)
-          (register-name->encoding/gr32 ,name nil)
-        (if index
-            (values index mode extra-bit)
-            (register-name->encoding/gr64 ,name))))
-    (:|GR16orGR32orGR64| `(multiple-value-bind (index mode extra-bit)
-                              (register-name->encoding/gr16 ,name nil)
-                            (cond
-                              (index
-                               (values index mode extra-bit))
-                              ((progn
-                                 (multiple-value-setq (index mode extra-bit)
-                                   (register-name->encoding/gr32 ,name nil))
-                                 index)
-                               (values index mode extra-bit))
-                              (t (register-name->encoding/gr64 ,name)))))
-    (:gr16        `(register-name->encoding/gr16 ,name))
-    (:gr8         `(register-name->encoding/gr8  ,name))
-    ;; FIXME the next 3 also needs to extract the extra-bit
-    (:vr512       `(vr512-index (vr512 ,name))) ; ZMM0-ZMM15
-    (:vr256       `(vr256-index (vr256 ,name))) ; YMM0-YMM15
-    ((:vr128 :fr32 :fr64) `(vr128-index (vr128 ,name))) ; XMM0-XMM15
-    (:vr64        `(vr64-index (vr64 ,name))) ; MM0-MM7
-    (:control_reg `(cr-index (cr ,name))) ; CR0-CR7
-    (:debug_reg   `(dr-index (dr ,name))) ; DR0-DR7
-    (:|RSTi|      `(st-index (st ,name))) ; ST0-ST7
-    (:segment_reg `(sr-index (sr ,name)))))
+(defmacro decode-register (reg expected-class)
+  `(progn
+     ,(ecase expected-class
+        ((:|GR32orGR64| :|GR16orGR32orGR64|)) ; the index lookup also does the type-check
+        ((gr8 gr16 gr32 gr64
+          vr64 vr128 vr512 vr256
+          st cr dr sr)
+         `(check-type ,reg ,expected-class)))
+     (let ((index
+             ,(ecase expected-class
+                (:|GR32orGR64|
+                 ;; GR32orGR64 means: this slot could be a 32-bit or a 64-bit
+                 ;; general register, depending on prefixes. In 32-bit mode, it’s
+                 ;; fixed to 32-bit. In 64-bit mode, the assembler decides:
+                 ;; without REX.W, use 32-bit; with REX.W, use 64-bit.
+                 `(typecase ,reg
+                    ((or gr32 gr64) (index-of ,reg))
+                    (t (unexpected-register ,reg ',expected-class))))
+                (:|GR16orGR32orGR64|
+                 `(typecase ,reg
+                    ((or gr16 gr32 gr64) (index-of ,reg))
+                    (t (unexpected-register ,reg ',expected-class))))
+                ((gr8 gr16 gr32 gr64
+                  vr64 vr128 vr512 vr256
+                  st cr dr sr)
+                 `(index-of ,reg)))))
+       (cond
+         ((<= 0 index 7)
+          (values index nil))
+         ,@(when (or (member expected-class '(:|GR32orGR64| :|GR16orGR32orGR64|))
+                     (< 7 (max-index-of (closer-mop:class-prototype (find-class expected-class)))))
+             '(((<= 8 index 15)
+                (values (- index 8) 1))))
+         (t (error "BUG: register index is ~A?!" index))))))
 
-(defun unexpected-register (name expected-class)
+(defun unexpected-register (reg expected-class)
   (invalid-instruction-error
    "Trying to use register ~A while expecting a ~S"
-   (fully-qualified-symbol-name name) expected-class))
+   name expected-class))
 
-(defun unknown-register (name)
-  (invalid-instruction-error "Invalid register name: ~A"
-                             (fully-qualified-symbol-name name)))
-
-(defun register-name->encoding/gr8 (name &optional (otherwise nil otherwise?))
-  (declare (type symbol name))
-  (acond
-    ((gr8 name nil)
-     (let ((index (gr8-index it))
-           (extra-bit nil))
-       (when (< 7 index)
-         (setf extra-bit 1)
-         (decf index 8))
-       (values index 8 extra-bit)))
-    (otherwise? otherwise)
-    (t (unexpected-register name :gr8))))
-
-(defun register-name->encoding/gr16 (name &optional (otherwise nil otherwise?))
-  (declare (type symbol name))
-  (acond
-    ((gr16 name nil)
-     (let ((index (gr16-index it))
-           (extra-bit nil))
-       (when (< 7 index)
-         (setf extra-bit 1)
-         (decf index 8))
-       (values index 16 extra-bit)))
-    (otherwise? otherwise)
-    (t (unexpected-register name :gr16))))
-
-(defun register-name->encoding/gr32 (name &optional (otherwise nil otherwise?))
-  (declare (type symbol name))
-  (acond
-    ((gr32 name nil)
-     (let ((index (gr32-index it))
-           (extra-bit nil))
-       (when (< 7 index)
-         (setf extra-bit 1)
-         (decf index 8))
-       (values index 32 extra-bit)))
-    (otherwise? otherwise)
-    (t (unexpected-register name :gr32))))
-
-(defun register-name->encoding/gr64 (name)
-  (declare (type symbol name))
-  (let* ((reg (gr64 name))
-         (index (gr64-index reg))
-         (extra-bit nil))
-    (when (< 7 index)
-      (setf extra-bit 1)
-      (decf index 8))
-    (values index 64 extra-bit)))
+;; TODO delme?
+(defun unknown-register (reg)
+  (invalid-instruction-error "Invalid register: ~A" reg))

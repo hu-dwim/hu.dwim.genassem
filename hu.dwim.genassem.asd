@@ -19,6 +19,7 @@
   :depends-on (:alexandria
                :anaphora
                :hu.dwim.genassem/asm-common
+               :hu.dwim.genassem/x86
                :com.inuoe.jzon
                :uiop
                :metabang-bind
@@ -56,6 +57,9 @@
   :depends-on (:alexandria
                :anaphora
                :hu.dwim.genassem/asm-common
+               ;; for a single use of CLOSER-MOP:CLASS-PROTOTYPE; it
+               ;; could be avoided relatively easily.
+               :closer-mop
                :uiop)
   :in-order-to ((test-op (test-op :hu.dwim.genassem/x86.test)))
   :components ((:module "source"

@@ -8,9 +8,9 @@
 
 (defvar *current-instruction*)
 
-(defmacro define-instruction (&whole instr-form name args &body body)
-  `(defmacro ,name ,args
-     (let ((*current-instruction* ',instr-form))
+(defmacro define-instruction (name args &body body)
+  `(defun ,name ,args
+     (let ((*current-instruction* ',name))
        ,@body)))
 
 (defvar *asm-context*)
@@ -33,10 +33,8 @@
   (mode-of *asm-context*))
 
 (define-instruction bits (bits)
-  (once-only (bits)
-    `(progn
-       (assert (member ,bits '(16 32 64)))
-       (setf (mode-of *asm-context*) ,bits))))
+  (assert (member bits '(16 32 64)))
+  (setf (mode-of *asm-context*) bits))
 
 (define-condition assembler-error
     (serious-condition)

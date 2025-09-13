@@ -247,8 +247,8 @@
 
 (deftest invalids ()
   (map nil (lambda (instr)
-             (signals invalid-instruction-error
-               (macroexpand instr)))
+             (signals serious-condition
+               (eval instr)))
        '((_bswap32r r14)
          (_bswap64r eax)
          (_adc8i8 #x112)
