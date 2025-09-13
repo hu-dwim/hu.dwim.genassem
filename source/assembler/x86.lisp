@@ -54,7 +54,18 @@
 (defmacro decode-register (reg expected-class)
   `(progn
      ,(ecase expected-class
-        ((:|GR32orGR64| :|GR16orGR32orGR64|)) ; the index lookup also does the type-check
+        (:|GR32orGR64|
+         ;; TODO ?
+         #+nil
+         `(typecase ,reg
+            (gr32 (when (<= 32 (current-execution-mode))
+                    (unexpected-register ,reg 'gr32)))
+            (gr64 (when (< (current-execution-mode) 64)
+                    (unexpected-register ,reg 'gr64)))
+            (t (unexpected-register ,reg ',expected-class))))
+        (:|GR16orGR32orGR64|
+         ;; TODO ?
+         )
         ((gr8 gr16 gr32 gr64
           vr64 vr128 vr512 vr256
           st cr dr sr)
@@ -62,10 +73,14 @@
      (let ((index
              ,(ecase expected-class
                 (:|GR32orGR64|
-                 ;; GR32orGR64 means: this slot could be a 32-bit or a 64-bit
-                 ;; general register, depending on prefixes. In 32-bit mode, it’s
-                 ;; fixed to 32-bit. In 64-bit mode, the assembler decides:
-                 ;; without REX.W, use 32-bit; with REX.W, use 64-bit.
+                 ;; GR32orGR64 means: this slot could be a 32-bit or a
+                 ;; 64-bit general register, depending on prefixes. In
+                 ;; 32-bit mode, it’s fixed to 32-bit. In 64-bit mode,
+                 ;; the assembler decides: without REX.W, use 32-bit;
+                 ;; with REX.W, use 64-bit.  But then sometimes REX.W
+                 ;; is not valid (i.e. hasREX_W=0) then it means that
+                 ;; the current execution mode specifies which
+                 ;; register class is valid (e.g. PEXTRBrri)
                  `(typecase ,reg
                     ((or gr32 gr64) (index-of ,reg))
                     (t (unexpected-register ,reg ',expected-class))))
@@ -82,7 +97,9 @@
           (values index nil))
          ,@(when (or (member expected-class '(:|GR32orGR64| :|GR16orGR32orGR64|))
                      (< 7 (max-index-of (closer-mop:class-prototype (find-class expected-class)))))
-             '(((<= 8 index 15)
+             `(((<= 8 index 15)
+                (unless (<= 64 (current-execution-mode))
+                  (invalid-instruction-error "Register 7-15 (~A) can only be encoded in 64 bit mode" ,reg))
                 (values (- index 8) 1))))
          (t (error "BUG: register index is ~A?!" index))))))
 

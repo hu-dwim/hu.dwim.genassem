@@ -229,8 +229,8 @@
                       `(emit-imm ,-name- 64))))))
         (assert (null parameters))))))
 
-(defun form/mrm (instr name rex prefix-bytes opcode-prefix-bytes opcode)
-  (destructuring-bind (&key form op-size
+(defun form/mrm (instr name prefix-bytes opcode-prefix-bytes opcode)
+  (destructuring-bind (&key form op-size has-rex.w
                          parameters &allow-other-keys)
       instr
     (let* ((modrm 0)
@@ -299,15 +299,21 @@
                              (decode-register ,src-reg ,src-type))
                         '(progn))
                   (emit-bytes ',prefix-bytes)
-                  ;; TODO when expected-mode is present and it's not
-                  ;; 64 then this whole WHEN is unnecessary
-                  (when (or (typep ,(car dst-reg-param) 'gr64)
-                            ,@(when src-reg
-                                `((typep ,src-reg 'gr64))))
-                    (emit-byte (logior ,(or rex (logior #x40 rex.w))
-                                       (if reg-extra-bit/1 ,rex.b 0)
-                                       ,@(when src-reg
-                                           `((if reg-extra-bit/2 ,rex.r 0))))))
+                  ;; REX
+                  (let (,@(when has-rex.w
+                            `((rex.w-part (if (typep ,dst-reg 'gr64)
+                                              ,rex.w
+                                              0)))))
+                    (when (or ,@(when has-rex.w
+                                  '((not (zerop rex.w-part))))
+                              reg-extra-bit/1
+                              ,@(when src-reg
+                                  '(reg-extra-bit/2)))
+                      (emit-byte (logior #x40 ,@(when has-rex.w
+                                                  '(rex.w-part))
+                                         (if reg-extra-bit/1 ,rex.b 0)
+                                         ,@(when src-reg
+                                             `((if reg-extra-bit/2 ,rex.r 0)))))))
                   ,@(when (needs-operand-size-prefix? op-size)
                       '((maybe-emit-operand-size-prefix)))
                   (emit-bytes ',opcode-prefix-bytes)
@@ -465,7 +471,6 @@
              (emit-asm-form
               (form/mrm instr
                         lisp-name
-                        rex
                         (nreverse prefix-bytes)
                         (nreverse opcode-prefix-bytes)
                         opcode))

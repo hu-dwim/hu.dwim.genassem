@@ -41,6 +41,8 @@
    #:maybe-emit-operand-size-prefix
 
    ;; these are only exported so that the output is not filled with pkg:: prefixes
+   #:rex.w-part
+
    #:reg-extra-bit/1
    #:reg-index/1
 

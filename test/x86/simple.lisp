@@ -120,11 +120,11 @@
       (_mov64cr rax cr0)
       (_mov64rc cr0 r15)
       (_mov64rc cr1 r11)
-      "00000000  480F22D9          mov cr3,rcx
-00000004  480F22FA          mov cr7,rdx
-00000008  480F22C0          mov cr0,rax
-0000000C  490F20C7          mov r15,cr0
-00000010  490F20CB          mov r11,cr1
+      "00000000  0F22D9            mov cr3,rcx
+00000003  0F22FA            mov cr7,rdx
+00000006  0F22C0            mov cr0,rax
+00000009  410F20C7          mov r15,cr0
+0000000D  410F20CB          mov r11,cr1
 "))))
 
 (deftest form/mrm ()
@@ -190,7 +190,7 @@
 00000006  4989C7            mov r15,rax
 00000009  4D89C6            mov r14,r8
 0000000C  660F3A17F811      extractps eax,xmm7,byte 0x11
-00000012  66490F3A17FF11    extractps r15d,xmm7,byte 0x11
+00000012  66410F3A17FF11    extractps r15d,xmm7,byte 0x11
 00000019  660F3A14C311      pextrb ebx,xmm0,byte 0x11
 0000001F  660F3A14FA11      pextrb edx,xmm7,byte 0x11
 ")
@@ -199,20 +199,23 @@
 (deftest form/mrm/destreg/bug/1 ()
   (with-expected-failures
     (compare-with-external-assembler/x86
-     '(((bits 64)
-        ;; this is an architectural headache without a trivial fix:
-        ;; DECODE-REGISTER happens at macroexpand-time, but with the
-        ;; :|GR32orGR64| operand type it would need to dispatch on the
-        ;; execution mode, which is only available at runtime in the
-        ;; current setup.  this is also related to being able to
-        ;; generate a functional interface where there's no
-        ;; macroexpand time.
+     '((;; this instruction operates on the low 8 bits of the
+        ;; register, but the register encoding is the same as a GR32
+        ;; or GR64. in practice this means that rbx is "normalized" to
+        ;; ebx by ndisasm (and probably other disassemblers).
+        (bits 64)
         (_pextrbrri    #x11 xmm0 rbx)
-        (_pextrbrri    #x11 xmm15 ebx)
-        ;; TODO test whether (_pextrbrri #x11 xmm0 rbx) signals and
-        ;; error in 32bit mode.
-        "00000000  zork 66480F3A14C311    pextrb rbx,xmm0,byte 0x11
-00000007  zork 660F3A14FB11      pextrb ebx,xmm7,byte 0x11
+        (bits 32)
+        (_pextrbrri    #x11 xmm0 ebx)
+        (_pextrbrri    #x11 xmm6 ebx)
+        (bits 64)
+        (_pextrbrri    #x11 xmm6 rbx)
+        (_pextrbrri    #x11 xmm14 rbx)
+        "00000000  660F3A14C311      pextrb ebx,xmm0,byte 0x11
+00000006  660F3A14C311      pextrb ebx,xmm0,byte 0x11
+0000000C  660F3A14F311      pextrb ebx,xmm6,byte 0x11
+00000012  660F3A14F311      pextrb ebx,xmm6,byte 0x11
+00000018  66440F3A14F311    pextrb ebx,xmm14,byte 0x11
 ")
        ))))
 
@@ -256,4 +259,13 @@
          (_adc32i32 #x112345678)
          (_enter #x11234 #x12)
          (_enter #x1234 #x112)
-         )))
+         ))
+  (with-expected-failures
+    (signals serious-condition
+      (emit-assembly/x86
+        (bits 64)
+        (_pextrbrri    #x11 xmm0 ebx)))
+    (signals serious-condition
+      (emit-assembly/x86
+        (bits 32)
+        (_pextrbrri    #x11 xmm0 rbx)))))

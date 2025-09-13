@@ -12,11 +12,12 @@
 
 (deftest register-lookup ()
   (macrolet ((test-it (register-class elements)
-               `(mapcar (lambda (el)
-                          (is (equal (second el)
-                                     (multiple-value-list
-                                      (decode-register (first el) ,register-class)))))
-                        ,elements)))
+               `(with-asm ()
+                  (mapcar (lambda (el)
+                            (is (equal (second el)
+                                       (multiple-value-list
+                                        (decode-register (first el) ,register-class)))))
+                          ,elements))))
     (test-it gr8
              `((,al   (0 ()))
                (,bl   (3 ()))

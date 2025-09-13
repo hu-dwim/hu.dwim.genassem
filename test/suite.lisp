@@ -44,7 +44,10 @@
         :for instrs = (butlast entry)
         :for expected = (car (last entry))
         :for session = (eval `(with-asm () ,@instrs))
+        ;; :do (print (xed-output session))
+        ;; :do (print (zydis-output session))
         :do (is (equal expected (ndisasm-output session)))
-            ;; :do (print (xed-output context))
-            ;; :do (print (zydis-output context))
         ))
+
+(defmacro emit-assembly/x86 (&body instrs)
+  `(eval '(with-asm () ,@instrs)))
