@@ -19,7 +19,7 @@ OUTPUT_DIR=$(readlink -f ${SCRIPT_DIR}/../tablegen/)
 
 echo "Saving TableGen json output to ${OUTPUT_DIR}"
 
-mkdir ${OUTPUT_DIR}
+mkdir --parents ${OUTPUT_DIR}
 
 LLVM=$(guix build llvm | sed -n '2p')
 LLVM_SRC=$(guix build --source llvm)

@@ -24,18 +24,11 @@ writing code that switches execution mode...?
 
 must use a symbol-macrolet and access it through macroexpand-1 on the
 &environment to retrieve it.
-** architectural headache around staging computation; add a functional interface
-sometimes DECODE-REGISTER wants to dispatch on the
-CURRENT-EXECUTION-MODE (GR32orGR64 operand types), but that is only
-available at runtime.
+** ? MOP optimization to seal classes/generics
+https://github.com/marcoheisig/fast-generic-functions
 
-moving the D-R call into the expansion would be a costy code reorg.
-
-consider using a small partial-eval and constructing the entire
-instruction emit form and let the p-e deal with all this.
-
-this is related to adding a functional interface where the register
-name is passed as a function argument at runtime.
+https://github.com/alex-gutev/static-dispatch
+obsolete: https://github.com/guicho271828/inlined-generic-function
 * features
 ** partition instructions by microarchitecture levels?
 or maybe add the predicates to the asm-context for runtime checks?
@@ -65,6 +58,19 @@ https://en.wikipedia.org/wiki/X86-64#Microarchitecture_levels
 | RBP    | EBP      | BP       | BPL (REX)   | —                      |
 | RSP    | ESP      | SP       | SPL (REX)   | —                      |
 | R8–R15 | R8D–R15D | R8W–R15W | R8B–R15B    | —                      |
+
+| Reg (64/32/16/8)   | ID (bin)             | REX.b extension | Notes / Quirks                                                                                                 |
+| ------------------ | -------------------- | --------------- | -------------------------------------------------------------------------------------------------------------- |
+| **RAX/EAX/AX/AL**  | 000                  | 0               | Accumulator: some instructions have **short opcodes** (e.g., `TEST AL,imm8 = A8 ib`).                          |
+| **RCX/ECX/CX/CL**  | 001                  | 0               | Counter: implicit in `LOOP`, `REP`, `SHL/SHR` (CL as shift count).                                             |
+| **RDX/EDX/DX/DL**  | 010                  | 0               | Data: implicit in `MUL/DIV`, `IN/OUT`.                                                                         |
+| **RBX/EBX/BX/BL**  | 011                  | 0               | Normal register, no quirks.                                                                                    |
+| **RSP/ESP/SP/SPL** | 100                  | 0               | Special in ModR/M: as `rm=100`, forces **SIB byte**.                                                           |
+| **RBP/EBP/BP/BPL** | 101                  | 0               | Special in ModR/M: as `rm=101,mod=00` means **disp32 absolute address**. `[rbp]` must be encoded as `[rbp+0]`. |
+| **RSI/ESI/SI/SIL** | 110                  | 0               | Implicit source index in string ops (`MOVS`, `LODS`, `CMPS`).                                                  |
+| **RDI/EDI/DI/DIL** | 111                  | 0               | Implicit destination index in string ops (`MOVS`, `STOS`, `SCAS`).                                             |
+| **R8–R15**         | 000–111 with REX.b=1 | 1               | Require **REX prefix**. Example: R8 = `000b` + REX.b=1.                                                        |
+
 
 x87 FPU stack (mostly obsolete):
  - 8 registers: ST(0)–ST(7)
@@ -97,6 +103,11 @@ System Registers:
  - GDTR, IDTR — descriptor table registers
  - LDTR, TR — task register and local descriptor table
  - MSRs (Model Specific Registers) — accessible with RDMSR / WRMSR
+
+VR128 = full XMM register.
+FR32 = low 32 bits of XMM, used as a float.
+FR64 = low 64 bits of XMM, used as a double.
+All three encode as an XMM register operand, but they differ in how much of it is used and how the bits are interpreted.
 *** encoding and prefixes
 https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/X86/MCTargetDesc/X86MCCodeEmitter.cpp#L1555
 
@@ -109,13 +120,17 @@ prefix byte order:
  - REX comes after legacy prefixes, just before opcode.
 
 0F: two-byte opcode escape prefix
-**** ModR/M
+**** #ModR/M
 +---+---+---+---+---+---+---+---+
 |   mod   |   reg/opcode  | r/m |
 +---+---+---+---+---+---+---+---+
   7   6     5   4   3     2   1 0
 
-- mod (2 bits): addressing mode (register, memory, disp8, disp32, etc.)
+- mod (2 bits): addressing mode
+  00 → memory, no displacement (except [rbp] quirk → requires disp32)
+  01 → memory + disp8
+  10 → memory + disp32
+  11 → register direct (no memory)
 - reg/opcode (3 bits):
   Normally selects a register operand.
   But in some opcodes, it’s treated as an opcode extension — this is where the /r vs /digit notation comes in.
@@ -136,25 +151,71 @@ prefix byte order:
 
 Special rule:
   If Mod = 00 and R/M = 101 → RIP-relative (in 64-bit mode) or disp32 (in 32-bit mode).
-**** REX (x86-64-v1)
+
+Special ModR/M cases:
+ - rm=100 + mod!=11 → SIB byte required (rsp / esp).
+ - rm=101 + mod=00 → disp32 absolute addressing (not [ebp]).
+**** #REX (x86-64-v1)
 Emit this when using 64-bit operands or registers R8–R15.
 
 REX:  0 1 0 0 W R X B (0x4_)
-0 REX.B 4th bit of modrm.r/m (or opreg in the few opcodes that encode the register in the 3 lowest opcode bits, such as "POP reg")
-1 REX.X and B expand index and base in the SIB byte
-2 REX.R 4th bit of modrm.reg
-3 REX.W changes the operand size to 64 bits
+0: REX.B
+ - 4th bit of modrm.r/m (or opreg in the few opcodes that encode the register in the 3 lowest opcode bits, such as "POP reg")
+ - 4th bit for the base in the SIB byte
+
+1: REX.X
+ - 4th bit for the index in the SIB byte
+
+2: REX.R
+ - 4th bit of modrm.reg
+
+3: REX.W
+ - changes the operand size to 64 bits
 
 REX2: 0xD5
       M0 R4 X4 B4 W R3 X3 B3
+
+-------
+
+1. When REX is *required*
+  Accessing high registers (r8–r15, xmm8–xmm15, etc.)
+    → Must use REX.B, REX.R, or REX.X to encode the high register bit.
+
+  64-bit operand size needed (e.g. mov rax, rcx)
+    → Must set REX.W=1.
+
+  Instructions that only exist in 64-bit mode and mandate REX
+    → e.g. movsxd r64, r/m32 requires a REX prefix in 64-bit mode to be recognized.
+
+2. When REX is *optional* and ignored
+  If the instruction does not look at operand size override and you’re only using low registers (rax–r7, xmm0–xmm7, etc.), then:
+   - REX.W=0 is ignored.
+   - Emitting or omitting the REX has no effect (like your PEXTRB example).
+
+  Any “superfluous” REX in this category is architecturally valid, but it’s wasteful and assemblers usually omit it.
+
+3. When REX is *forbidden* (illegal)
+  In 32-bit or 16-bit modes:
+    → The CPU will treat REX prefixes as ordinary opcodes (40h–4Fh) and raise UD.
+
+  In 64-bit mode, some instructions explicitly disallow REX:
+    → e.g. legacy instructions with AH, CH, DH, BH in 8-bit form cannot be encoded if REX is present, because REX repurposes those encodings to extend SPL, BPL, SIL, DIL.
 **** SIB byte
+7 6   | 5 4 3 | 2 1 0
+scale | index | base
+
+
 Encode SIB when memory operand uses [base + index*scale + disp]
 
 Only when ModR/M r/m = 100 (SIB)
 
 Scale: 00 → ×1, 01 → ×2, 10 → ×4, 11 → ×8
-Index: register
-Base: register or special (e.g., no base = 101)
+Index:
+  - register id of index, extended by REX.x
+  - If index=100 (esp) → no index used (acts as “none”).
+Base:
+ - register id of base, extended by REX.b
+ - If base=101 and mod=00 → disp32 only (no base register).
 **** Displacement
 when memory addressing requires it (ModR/M indicates displacement)
 Size: 1, 4, or sometimes 8 bytes (64-bit RIP-relative)
@@ -291,6 +352,51 @@ This would let you keep a single assembler rule for bswap, push, etc.
 *** json
 https://llvm.org/docs/TableGen/BackEnds.html#json-reference
 https://github.com/llvm/llvm-project/blob/main/llvm/lib/Target/X86/MCTargetDesc/X86MCCodeEmitter.cpp
+**** hasREX_W
+- hasREX_W=1 → the instruction’s operand size is controlled by the W bit of the REX prefix. REX.W can select 64-bit operand in 64-bit mode.
+
+- hasREX_W=0 → the W bit has no defined effect for this instruction. Width follows mode, cannot promote via REX.W
+
+That doesn’t mean “the instruction can’t use a REX prefix at all” — it just means the W bit doesn’t affect its semantics.
+**** TODO How to interpret GR32orGR64 and GR16orGR32orGR64
+1. Look at OpSize
+  OpSizeFixed → Go to Step 2
+  OpSize16 / OpSize32 / OpSize64 → Go to Step 3
+
+2. OpSizeFixed
+
+  Operand width is fixed by the instruction form, ignore REX.W.
+  Width = current mode if allowed, or instruction-specified.
+  Example: PEXTRBrri → 32-bit only, even in 64-bit mode.
+  ✅ Decision: follow instruction, do not allow REX.W.
+
+3. OpSize variable
+  Check hasREX_W:
+    - hasREX_W = 1 → You can use REX.W to select 64-bit operand.
+      In 64-bit mode: default = 32-bit, REX.W optional → promote to 64-bit.
+      In 32-bit mode: always 32-bit (REX.W ignored).
+
+    - hasREX_W = 0 → Operand width follows CPU mode, cannot promote.
+      32-bit mode → 32-bit operand
+      64-bit mode → 64-bit operand if instruction allows
+      Example: ADCX32rr → 32-bit in 32-bit mode, 64-bit in 64-bit mode, REX.W optional.
+
+4. Extra check for encoding constraints
+  If instruction form uses MRM6r, MRMSrcReg, RawFrm, etc., verify whether the encoding actually allows 64-bit.
+
+  If not, ignore REX.W, even if hasREX_W = 1.
+
+----
+
+Key rules for assembler generation:
+
+  - Check execution mode (16/32/64-bit). Mode often dictates the default width if no prefix is used.
+  - Check OpSize in TableGen JSON:
+    - OpSizeFixed → width is fixed, ignore prefixes.
+    - OpSize16 → instruction defaults to 16-bit; operand-size prefix may be ignored.
+    - OpSize32 → instruction defaults to 32-bit.
+  - Check HasREX_W for 64-bit overrides.
+  - Prefixes: 0x66 affects 16/32-bit selection; REX.W affects 64-bit selection.
 **** *InOperandList* and *OutOperandList* order
 LLVM’s InOperandList isn’t just a bag of inputs: its position in the
 list tells the encoder which slot of the instruction encoding this

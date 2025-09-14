@@ -197,27 +197,27 @@
      )))
 
 (deftest form/mrm/destreg/bug/1 ()
-  (with-expected-failures
-    (compare-with-external-assembler/x86
-     '((;; this instruction operates on the low 8 bits of the
-        ;; register, but the register encoding is the same as a GR32
-        ;; or GR64. in practice this means that rbx is "normalized" to
-        ;; ebx by ndisasm (and probably other disassemblers).
-        (bits 64)
-        (_pextrbrri    #x11 xmm0 rbx)
-        (bits 32)
-        (_pextrbrri    #x11 xmm0 ebx)
-        (_pextrbrri    #x11 xmm6 ebx)
-        (bits 64)
-        (_pextrbrri    #x11 xmm6 rbx)
-        (_pextrbrri    #x11 xmm14 rbx)
-        "00000000  660F3A14C311      pextrb ebx,xmm0,byte 0x11
+  (compare-with-external-assembler/x86
+   '((;; the PEXTRBrri instruction operates on the low 8 bits of the
+      ;; register, but the register encoded just like a GR32 or GR64
+      ;; into the machine code. in practice this means that ndisasm,
+      ;; xed, and zydis (and probably other disassemblers) disassemble
+      ;; it as ebx.
+      (bits 64)
+      (_pextrbrri    #x11 xmm0 rbx)
+      (bits 32)
+      (_pextrbrri    #x11 xmm0 ebx)
+      (_pextrbrri    #x11 xmm6 ebx)
+      (bits 64)
+      (_pextrbrri    #x11 xmm6 rbx)
+      (_pextrbrri    #x11 xmm14 rbx)
+      "00000000  660F3A14C311      pextrb ebx,xmm0,byte 0x11
 00000006  660F3A14C311      pextrb ebx,xmm0,byte 0x11
 0000000C  660F3A14F311      pextrb ebx,xmm6,byte 0x11
 00000012  660F3A14F311      pextrb ebx,xmm6,byte 0x11
 00000018  66440F3A14F311    pextrb ebx,xmm14,byte 0x11
 ")
-       ))))
+     )))
 
 ;; TODO
 ;; (deftest form/mrm/vex ()
@@ -249,6 +249,7 @@
 "))))
 
 (deftest invalids ()
+  ;; TODO these should check for more specific error types
   (map nil (lambda (instr)
              (signals serious-condition
                (eval instr)))

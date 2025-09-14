@@ -59,10 +59,9 @@
             vr256
             vr512
             st    ; :|RSTi|
-            ;; TODO these are not handled at assembly-time
-            sr ; :segment_reg
-            cr ; :control_reg
-            dr ; :debug_reg
+            sr    ; :segment_reg
+            cr    ; :control_reg
+            dr    ; :debug_reg
             )
           :test 'eq))
 
@@ -236,7 +235,7 @@
            ;; This may or may not pop a register.
            (setf src-reg-param (pop-reg-param! parameters))))
 ;;;
-;;; MRMDestReg
+;;; MRMSrcReg
 ;;;
         ((equal form-str "MRMSrcReg")
          ;; source:      mrm.reg, rex.r
@@ -245,6 +244,9 @@
          (setf dst-reg-param (pop-reg-param! parameters))
          (setf src-reg-param (pop-reg-param! parameters)))
 
+;;;
+;;; MRMDestReg
+;;;
         ((equal form-str "MRMDestReg")
          ;; source:      mrm.r/m, rex.b
          ;; destination: mrm.reg, rex.r
@@ -417,8 +419,7 @@
    '(cons (eql define-instruction))
    (pprint-dispatch '(defun x (y)))))
 
-(defun generate-assembler/x86_64 (&key
-                                    (package :hu.dwim.genassem/x86))
+(defun generate-assembler/x86_64 (&key (package :hu.dwim.genassem/x86))
   (unless (packagep package)
     (setf package (find-package package)))
   (with-output-to-file

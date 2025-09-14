@@ -6,6 +6,7 @@
 
 (in-package :hu.dwim.genassem/asm-common)
 
+;; is this worth it? shall we add the args, too?
 (defvar *current-instruction*)
 
 (defmacro define-instruction (name args &body body)
