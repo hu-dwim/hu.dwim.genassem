@@ -185,7 +185,7 @@
            (dst-type (cdr dst-reg-param)))
       (assert dst-reg-param)
       `(define-instruction ,name ,(mapcar 'car (getf instr :parameters))
-         (multiple-value-bind (reg-index/1 reg-extra-bit/1)
+         (multiple-value-bind (dst-reg-index dst-reg-extra-bit)
              (decode-register ,dst-reg ,dst-type)
            ,@(emit-bytes-form prefix-bytes)
            ;; TODO OPTIMIZATION: sometimes this typep is known to
@@ -193,11 +193,11 @@
            (when (typep ,dst-reg 'gr64)
              ;; TODO how come rex is nil here for e.g. bswap32r?
              (emit-byte (logior ,(or rex (logior #x40 rex.w))
-                                (if reg-extra-bit/1 ,rex.b 0))))
+                                (if dst-reg-extra-bit ,rex.b 0))))
            ,@(when (needs-operand-size-prefix? op-size)
                '((maybe-emit-operand-size-prefix)))
            ,@(emit-bytes-form opcode-prefix-bytes)
-           (emit-byte (logior ',opcode reg-index/1))
+           (emit-byte (logior ',opcode dst-reg-index))
            ,@(emit-imm-forms parameters))))))
 
 (defun form/mrm (instr name prefix-bytes opcode-prefix-bytes opcode)
@@ -265,10 +265,10 @@
             (src-reg  (car src-reg-param))
             (src-type (cdr src-reg-param)))
         `(define-instruction ,name ,(mapcar 'car (getf instr :parameters))
-           (multiple-value-bind (reg-index/1 reg-extra-bit/1)
+           (multiple-value-bind (dst-reg-index dst-reg-extra-bit)
                (decode-register ,dst-reg ,dst-type)
              (,@(if src-reg
-                    `(multiple-value-bind (reg-index/2 reg-extra-bit/2)
+                    `(multiple-value-bind (src-reg-index src-reg-extra-bit)
                          (decode-register ,src-reg ,src-type))
                     '(progn))
               ,@(emit-bytes-form prefix-bytes)
@@ -279,21 +279,21 @@
                                           0)))))
                 (when (or ,@(when has-rex.w
                               '((not (zerop rex.w-part))))
-                          reg-extra-bit/1
+                          dst-reg-extra-bit
                           ,@(when src-reg
-                              '(reg-extra-bit/2)))
+                              '(src-reg-extra-bit)))
                   (emit-byte (logior #x40 ,@(when has-rex.w
                                               '(rex.w-part))
-                                     (if reg-extra-bit/1 ,rex.b 0)
+                                     (if dst-reg-extra-bit ,rex.b 0)
                                      ,@(when src-reg
-                                         `((if reg-extra-bit/2 ,rex.r 0)))))))
+                                         `((if src-reg-extra-bit ,rex.r 0)))))))
               ,@(when (needs-operand-size-prefix? op-size)
                   '((maybe-emit-operand-size-prefix)))
               ,@(emit-bytes-form opcode-prefix-bytes)
               (emit-byte ',opcode)
-              (emit-byte (logior ',modrm reg-index/1 ; modrm.r/m
+              (emit-byte (logior ',modrm dst-reg-index ; modrm.r/m
                                  ,@(when src-reg
-                                     `((ash reg-index/2 3))))) ; modrm.reg
+                                     `((ash src-reg-index 3))))) ; modrm.reg
               ,@(emit-imm-forms parameters))))))))
 
 (defun skip-instruction ()

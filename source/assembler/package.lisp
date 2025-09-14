@@ -44,11 +44,10 @@
    ;; these are only exported so that the output is not filled with pkg:: prefixes
    #:rex.w-part
 
-   #:reg-extra-bit/1
-   #:reg-index/1
-
-   #:reg-extra-bit/2
-   #:reg-index/2
+   #:dst-reg-extra-bit
+   #:dst-reg-index
+   #:src-reg-extra-bit
+   #:src-reg-index
 
    #:emit-imm
    ))
