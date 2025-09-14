@@ -83,3 +83,11 @@
 
 (defun emit-bytes (bytes)
   (map nil 'emit-byte bytes))
+
+(defun emit-bytes-form (var)
+  (check-type var (or null (cons fixnum)))
+  (if var
+      (if (cdr var)
+          `((emit-bytes ',var))
+          `((emit-byte ',(first var))))
+      (values)))

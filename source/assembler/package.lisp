@@ -13,6 +13,7 @@
    #:define-instruction
    #:emit-byte
    #:emit-bytes
+   #:emit-bytes-form
    #:with-asm
    #:current-execution-mode
    #:bits

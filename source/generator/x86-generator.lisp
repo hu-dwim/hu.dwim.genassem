@@ -14,20 +14,6 @@
 (defun needs-operand-size-prefix? (op-size)
   (eq op-size :|OpSize16|))
 
-(defun emit-imm (value bits &optional (signed? t))
-  (unless (or (and signed?
-                   (<= (- (1- (expt 2 (1- bits))))
-                       value
-                       (1- (expt 2 bits))))
-              (and (not signed?)
-                   (<= 0
-                       value
-                       (1- (expt 2 bits)))))
-    (invalid-instruction-error "~S bit immediate operand ~A is out of range" bits value))
-  (loop :for offset = 0 :then (+ offset 8)
-        :while (< offset bits)
-        :do (emit-byte (ldb (byte 8 offset) value))))
-
 ;; TODO drop the unused single-match? complexity
 (defmacro map-params! ((params &key (single-match? nil)) &body body)
   "What the name suggests, except that it also consumes/removes the param from the list when body returns with non-nil."
@@ -102,6 +88,64 @@
             )
           :test 'eq))
 
+(defun emit-imm (value bits &optional (signed? t))
+  (unless (or (and signed?
+                   (<= (- (1- (expt 2 (1- bits))))
+                       value
+                       (1- (expt 2 bits))))
+              (and (not signed?)
+                   (<= 0
+                       value
+                       (1- (expt 2 bits)))))
+    (invalid-instruction-error "~S bit immediate operand ~A is out of range" bits value))
+  (loop :for offset = 0 :then (+ offset 8)
+        :while (< offset bits)
+        :do (emit-byte (ldb (byte 8 offset) value))))
+
+(defun emit-imm-forms (parameters)
+  (prog1
+      (map-params! (parameters)
+        (case -type-
+          ((:|i8imm|
+            :|i16i8imm|
+            :|i32i8imm|
+            :|i64i8imm|
+            :|brtarget8|
+            )
+           `(emit-imm ,-name- 8))
+          ((:|offset16_8|
+            :|offset16_16|
+            :|offset16_32|
+            :|offset32_8|
+            :|offset32_16|
+            :|offset32_32|
+            :|offset32_64|
+            :|offset64_8|
+            :|offset64_16|
+            :|offset64_32|
+            :|offset64_64|)
+           ;; these are de facto obsolete, let's just skip them...
+           (skip-instruction))
+          (:|u8imm|
+           `(emit-imm ,-name- 8 nil))
+          ((:|i16imm|
+            :|i16imm_brtarget|
+            )
+           `(emit-imm ,-name- 16))
+          ((:|i32imm|
+            :|i64i32imm|
+            :|i32imm_brtarget|
+            :|i64i32imm_brtarget|
+            )
+           `(emit-imm ,-name- 32))
+          ((:|i64imm|
+             )
+           `(emit-imm ,-name- 64))))
+    ;; Make sure we have consumed all the paramaters (immediates are
+    ;; always the last ones).
+    (when parameters
+      (format *error-output* "TODO: some operands have remained unprocessed: ~A~%" parameters))))
+
 (defun form/raw (instr name rex prefix-bytes opcode-prefix-bytes opcode)
   (destructuring-bind (&key form op-size parameters
                        &allow-other-keys)
@@ -125,52 +169,13 @@
           :|RawFrmMemOffs|)
          ;; nop; just to error for unexpected values
          ))
-      (prog1
-          `(define-instruction ,name ,(mapcar 'car parameters)
-             (emit-bytes ',prefix-and-rex)
-             ,@(when (needs-operand-size-prefix? op-size)
-                 '((maybe-emit-operand-size-prefix)))
-             (emit-bytes ',opcode-part)
-             ;; emit immediates, if any
-             ,@(map-params! (parameters)
-                 (case -type-
-                   ((:|i8imm|
-                     :|i16i8imm|
-                     :|i32i8imm|
-                     :|i64i8imm|
-                     :|brtarget8|
-                     )
-                    `(emit-imm ,-name- 8))
-                   ((:|offset16_8|
-                     :|offset16_16|
-                     :|offset16_32|
-                     :|offset32_8|
-                     :|offset32_16|
-                     :|offset32_32|
-                     :|offset32_64|
-                     :|offset64_8|
-                     :|offset64_16|
-                     :|offset64_32|
-                     :|offset64_64|)
-                    ;; these are de facto obsolete, let's just skip them...
-                    (skip-instruction))
-                   (:|u8imm|
-                    `(emit-imm ,-name- 8 nil))
-                   ((:|i16imm|
-                     :|i16imm_brtarget|
-                     )
-                    `(emit-imm ,-name- 16))
-                   ((:|i32imm|
-                     :|i64i32imm|
-                     :|i32imm_brtarget|
-                     :|i64i32imm_brtarget|
-                     )
-                    `(emit-imm ,-name- 32))
-                   ((:|i64imm|
-                      )
-                    `(emit-imm ,-name- 64)))))
-        ;; Make sure we have consumed all the immediates
-        (assert (null parameters))))))
+      `(define-instruction ,name ,(mapcar 'car parameters)
+         ,@(emit-bytes-form prefix-and-rex)
+         ,@(when (needs-operand-size-prefix? op-size)
+             '((maybe-emit-operand-size-prefix)))
+         ,@(emit-bytes-form opcode-part)
+         ;; emit immediates, if any
+         ,@(emit-imm-forms parameters)))))
 
 (defun form/add-reg (instr name rex prefix-bytes opcode-prefix-bytes opcode)
   (destructuring-bind (&key op-size     ; inputs outputs
@@ -180,54 +185,21 @@
            (dst-reg  (car dst-reg-param))
            (dst-type (cdr dst-reg-param)))
       (assert dst-reg-param)
-      (prog1
-          `(define-instruction ,name ,(mapcar 'car (getf instr :parameters))
-             (multiple-value-bind (reg-index/1 reg-extra-bit/1)
-                 (decode-register ,dst-reg ,dst-type)
-               (emit-bytes ',prefix-bytes)
-               ;; TODO OPTIMIZATION: sometimes this typep is known to
-               ;; be false at generation time; add a dispatch to it.
-               (when (typep ,dst-reg 'gr64)
-                 ;; TODO how come rex is nil here for e.g. bswap32r?
-                 (emit-byte (logior ,(or rex (logior #x40 rex.w))
-                                    (if reg-extra-bit/1 ,rex.b 0))))
-               ,@(when (needs-operand-size-prefix? op-size)
-                   '((maybe-emit-operand-size-prefix)))
-               (emit-bytes ',opcode-prefix-bytes)
-               (emit-byte (logior ',opcode reg-index/1))
-               ;; TODO copy-paste from above
-               ,@(map-params! (parameters)
-                   (case -type-
-                     ((:|i8imm|
-                       :|i16i8imm|
-                       :|i32i8imm|
-                       :|i64i8imm|
-                       :|brtarget8|)
-                      `(emit-imm ,-name- 8))
-                     ((:|offset16_8|
-                       :|offset16_16|
-                       :|offset16_32|
-                       :|offset32_8|
-                       :|offset32_16|
-                       :|offset32_32|
-                       :|offset32_64|
-                       :|offset64_8|
-                       :|offset64_16|
-                       :|offset64_32|
-                       :|offset64_64|)
-                      ;; these are de facto obsolete, let's just skip them...
-                      (skip-instruction))
-                     (:|u8imm|
-                      `(emit-imm ,-name- 8 nil))
-                     (:|i16imm|
-                      `(emit-imm ,-name- 16))
-                     ((:|i32imm|
-                       :|i64i32imm|
-                       :|i64i32imm_brtarget|)
-                      `(emit-imm ,-name- 32))
-                     (:|i64imm|
-                      `(emit-imm ,-name- 64))))))
-        (assert (null parameters))))))
+      `(define-instruction ,name ,(mapcar 'car (getf instr :parameters))
+         (multiple-value-bind (reg-index/1 reg-extra-bit/1)
+             (decode-register ,dst-reg ,dst-type)
+           ,@(emit-bytes-form prefix-bytes)
+           ;; TODO OPTIMIZATION: sometimes this typep is known to
+           ;; be false at generation time; add a dispatch to it.
+           (when (typep ,dst-reg 'gr64)
+             ;; TODO how come rex is nil here for e.g. bswap32r?
+             (emit-byte (logior ,(or rex (logior #x40 rex.w))
+                                (if reg-extra-bit/1 ,rex.b 0))))
+           ,@(when (needs-operand-size-prefix? op-size)
+               '((maybe-emit-operand-size-prefix)))
+           ,@(emit-bytes-form opcode-prefix-bytes)
+           (emit-byte (logior ',opcode reg-index/1))
+           ,@(emit-imm-forms parameters))))))
 
 (defun form/mrm (instr name prefix-bytes opcode-prefix-bytes opcode)
   (destructuring-bind (&key form op-size has-rex.w
@@ -290,73 +262,37 @@
             (dst-type (cdr dst-reg-param))
             (src-reg  (car src-reg-param))
             (src-type (cdr src-reg-param)))
-        (prog1
-            `(define-instruction ,name ,(mapcar 'car (getf instr :parameters))
-               (multiple-value-bind (reg-index/1 reg-extra-bit/1)
-                   (decode-register ,dst-reg ,dst-type)
-                 (,@(if src-reg
-                        `(multiple-value-bind (reg-index/2 reg-extra-bit/2)
-                             (decode-register ,src-reg ,src-type))
-                        '(progn))
-                  (emit-bytes ',prefix-bytes)
-                  ;; REX
-                  (let (,@(when has-rex.w
-                            `((rex.w-part (if (typep ,dst-reg 'gr64)
-                                              ,rex.w
-                                              0)))))
-                    (when (or ,@(when has-rex.w
-                                  '((not (zerop rex.w-part))))
-                              reg-extra-bit/1
-                              ,@(when src-reg
-                                  '(reg-extra-bit/2)))
-                      (emit-byte (logior #x40 ,@(when has-rex.w
-                                                  '(rex.w-part))
-                                         (if reg-extra-bit/1 ,rex.b 0)
-                                         ,@(when src-reg
-                                             `((if reg-extra-bit/2 ,rex.r 0)))))))
-                  ,@(when (needs-operand-size-prefix? op-size)
-                      '((maybe-emit-operand-size-prefix)))
-                  (emit-bytes ',opcode-prefix-bytes)
-                  (emit-byte ',opcode)
-                  (emit-byte (logior ',modrm reg-index/1 ; modrm.r/m
+        `(define-instruction ,name ,(mapcar 'car (getf instr :parameters))
+           (multiple-value-bind (reg-index/1 reg-extra-bit/1)
+               (decode-register ,dst-reg ,dst-type)
+             (,@(if src-reg
+                    `(multiple-value-bind (reg-index/2 reg-extra-bit/2)
+                         (decode-register ,src-reg ,src-type))
+                    '(progn))
+              ,@(emit-bytes-form prefix-bytes)
+              ;; REX
+              (let (,@(when has-rex.w
+                        `((rex.w-part (if (typep ,dst-reg 'gr64)
+                                          ,rex.w
+                                          0)))))
+                (when (or ,@(when has-rex.w
+                              '((not (zerop rex.w-part))))
+                          reg-extra-bit/1
+                          ,@(when src-reg
+                              '(reg-extra-bit/2)))
+                  (emit-byte (logior #x40 ,@(when has-rex.w
+                                              '(rex.w-part))
+                                     (if reg-extra-bit/1 ,rex.b 0)
                                      ,@(when src-reg
-                                         `((ash reg-index/2 3))))) ; modrm.reg
-                  ;; TODO copy-paste from above
-                  ,@(map-params! (parameters)
-                      (case -type-
-                        ((:|i8imm|
-                          :|i16i8imm|
-                          :|i32i8imm|
-                          :|i64i8imm|
-                          :|brtarget8|)
-                         `(emit-imm ,-name- 8))
-                        ((:|offset16_8|
-                          :|offset16_16|
-                          :|offset16_32|
-                          :|offset32_8|
-                          :|offset32_16|
-                          :|offset32_32|
-                          :|offset32_64|
-                          :|offset64_8|
-                          :|offset64_16|
-                          :|offset64_32|
-                          :|offset64_64|)
-                         (skip-instruction))
-                        ((:|u8imm|
-                          :|i16u8imm|
-                          :|i32u8imm|
-                          :|i64u8imm|)
-                         `(emit-imm ,-name- 8 nil))
-                        (:|i16imm|
-                         `(emit-imm ,-name- 16))
-                        ((:|i32imm|
-                          :|i64i32imm|
-                          :|i64i32imm_brtarget|)
-                         `(emit-imm ,-name- 32))
-                        (:|i64imm|
-                         `(emit-imm ,-name- 64)))))))
-          ;; TODO (assert (null parameters))
-          )))))
+                                         `((if reg-extra-bit/2 ,rex.r 0)))))))
+              ,@(when (needs-operand-size-prefix? op-size)
+                  '((maybe-emit-operand-size-prefix)))
+              ,@(emit-bytes-form opcode-prefix-bytes)
+              (emit-byte ',opcode)
+              (emit-byte (logior ',modrm reg-index/1 ; modrm.r/m
+                                 ,@(when src-reg
+                                     `((ash reg-index/2 3))))) ; modrm.reg
+              ,@(emit-imm-forms parameters))))))))
 
 (defun skip-instruction ()
   (throw :skip-instruction nil))
