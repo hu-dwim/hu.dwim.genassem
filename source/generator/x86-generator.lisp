@@ -159,14 +159,11 @@
     (when parameters
       (format *error-output* "TODO: some operands have remained unprocessed: ~A~%" parameters))))
 
-(defun form/raw (instr name rex prefix-bytes opcode-prefix-bytes opcode)
-  (destructuring-bind (&key form op-size parameters
+(defun form/raw (instr name prefix-bytes opcode-prefix-bytes opcode)
+  (destructuring-bind (&key form op-size has-rex.w parameters
                        &allow-other-keys)
       instr
-    (let ((prefix-and-rex (append prefix-bytes
-                                  (when rex
-                                    (list rex))))
-          (opcode-part (append opcode-prefix-bytes
+    (let ((opcode-part (append opcode-prefix-bytes
                                (list opcode)))
           ;; All raw forms share that register operands are implicit.
           (parameters parameters))
@@ -183,7 +180,10 @@
          ;; nop; just to error for unexpected values
          ))
       `(define-instruction ,name ,(mapcar 'car parameters)
-         ,@(emit-bytes-form prefix-and-rex)
+         ,(operand-type-declarations)
+         ,@(emit-bytes-form prefix-bytes)
+         ,@(when has-rex.w
+             `((emit-byte ,(logior #x40 rex.w))))
          ,@(when (may-have-operand-size-prefix? op-size)
              '((maybe-emit-operand-size-prefix)))
          ,@(emit-bytes-form opcode-part)
@@ -315,7 +315,7 @@
 (defun generate-x86-instruction-emitter (instr)
   (catch :skip-instruction
     (bind (((&key name parameters form predicates
-                  opcode op-enc op-map has-rex.w
+                  opcode op-enc op-map
                   op-prefix             ;op-prefix/explicit
                   form-category has-position-order
                   &allow-other-keys) instr)
@@ -325,8 +325,6 @@
                                       name)))
            (prefix-bytes ())
            (opcode-prefix-bytes ())
-           (rex (when has-rex.w
-                  (logior #x40 rex.w)))
            (*package* (find-package :hu.dwim.genassem/x86/functional))
            ;; normalize the param types to our clos classes
            ;; representing the various register classes
@@ -407,7 +405,6 @@
              (emit-asm-form
               (form/raw instr
                         lisp-name
-                        rex
                         (nreverse prefix-bytes)
                         (nreverse opcode-prefix-bytes)
                         opcode))
