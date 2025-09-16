@@ -101,7 +101,10 @@
                    (<= 0
                        value
                        (1- (expt 2 bits)))))
-    (invalid-instruction-error "~S bit immediate operand ~A is out of range" bits value))
+    (invalid-operand-error
+     value
+     "~S bit ~A immediate operand ~A is out of range"
+     bits (if signed? "signed" "unsigned") value))
   (loop :for offset = 0 :then (+ offset 8)
         :while (< offset bits)
         :do (emit-byte (ldb (byte 8 offset) value))))

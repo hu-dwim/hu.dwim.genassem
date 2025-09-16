@@ -6,13 +6,9 @@
 
 (in-package :hu.dwim.genassem/asm-common)
 
-;; is this worth it? shall we add the args, too?
-(defvar *current-instruction*)
-
 (defmacro define-instruction (name args &body body)
   `(defun ,name ,args
-     (let ((*current-instruction* ',name))
-       ,@body)))
+     ,@body))
 
 (defvar *asm-context*)
 
@@ -52,12 +48,7 @@
 
 (define-condition invalid-instruction-error
     (simple-assembler-error)
-  ((instruction :accessor instruction-of :initarg :instruction
-                :initform (when (boundp '*current-instruction*)
-                            *current-instruction*))
-   (execution-mode :accessor execution-mode-of :initarg :execution-mode
-                   :initform (when (boundp '*asm-context*)
-                               (current-execution-mode)))))
+  ())
 
 (defun invalid-instruction-error (&optional format &rest args)
   (signal 'invalid-instruction-error
