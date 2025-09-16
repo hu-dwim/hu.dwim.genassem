@@ -117,20 +117,11 @@
             :|brtarget8|
             )
            `(emit-imm ,-name- 8))
-          ((:|offset16_8|
-            :|offset16_16|
-            :|offset16_32|
-            :|offset32_8|
-            :|offset32_16|
-            :|offset32_32|
-            :|offset32_64|
-            :|offset64_8|
-            :|offset64_16|
-            :|offset64_32|
-            :|offset64_64|)
-           ;; these are de facto obsolete, let's just skip them...
-           (skip-instruction))
-          (:|u8imm|
+          ((:|u8imm|
+            :|i16u8imm|
+            :|i32u8imm|
+            :|i64u8imm|
+            )
            `(emit-imm ,-name- 8 nil))
           ((:|i16imm|
             :|i16imm_brtarget|
@@ -144,9 +135,24 @@
            `(emit-imm ,-name- 32))
           ((:|i64imm|
              )
-           `(emit-imm ,-name- 64))))
+           `(emit-imm ,-name- 64))
+          ((:|offset16_8|
+            :|offset16_16|
+            :|offset16_32|
+            :|offset32_8|
+            :|offset32_16|
+            :|offset32_32|
+            :|offset32_64|
+            :|offset64_8|
+            :|offset64_16|
+            :|offset64_32|
+            :|offset64_64|)
+           ;; these are de facto obsolete, let's just skip them...
+           (skip-instruction))))
     ;; Make sure we have consumed all the paramaters (immediates are
     ;; always the last ones).
+    (assert (null parameters))
+    #+nil
     (when parameters
       (format *error-output* "TODO: some operands have remained unprocessed: ~A~%" parameters))))
 
@@ -296,28 +302,22 @@
              ,@(when (may-have-operand-size-prefix? op-size)
                  '((maybe-emit-operand-size-prefix)))
              ;; REX
-             (let (,@(when has-rex.w
-                       `((rex.w-part ,(if (eq dst-type 'gr64)
-                                          rex.w
-                                          `(if (typep ,dst-reg 'gr64)
-                                               ,rex.w
-                                               0)))))
-                   (dst-reg-extra-bit (when (< 7 dst-reg-index)
-                                        ,rex.b))
-                   ,@(when src-reg `((src-reg-extra-bit (when (< 7 src-reg-index)
-                                                          ,rex.r)))))
-               (when (or ,@(when has-rex.w
-                             (if (eq dst-type 'gr64)
-                                 '(t)
-                                 '((not (zerop rex.w-part)))))
-                         dst-reg-extra-bit
-                         ,@(when src-reg
-                             '(src-reg-extra-bit)))
-                 (emit-byte (logior #x40 ,@(when has-rex.w
-                                             '(rex.w-part))
-                                    (or dst-reg-extra-bit 0)
-                                    ,@(when src-reg
-                                        `((or src-reg-extra-bit 0)))))))
+             (let ((rex #x40))
+               ,@(when has-rex.w
+                   (if (eq dst-type 'gr64) ; at gen time
+                       `((incf rex ,rex.w))
+                       `((when (typep ,dst-reg 'gr64) ; at runtime
+                           (incf rex ,rex.w)))))
+               (when (< 7 dst-reg-index)
+                 (incf rex ,rex.b))
+               ,@(when src-reg
+                   `((when (< 7 src-reg-index)
+                       (incf rex ,rex.r))))
+               ,(if (and has-rex.w
+                         (eq dst-type 'gr64))
+                    `(emit-byte rex)
+                    `(unless (eql rex #x40)
+                       (emit-byte rex))))
              ,@(emit-bytes-form opcode-prefix-bytes)
              (emit-byte ',opcode)
              (emit-byte (logior ',modrm (logand dst-reg-index #b111) ; modrm.r/m

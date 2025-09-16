@@ -48,7 +48,7 @@
         )
   (:export
    ;; these are only exported so that the output is not filled with pkg:: prefixes
-   #:rex.w-part
+   #:rex
 
    #:dst-reg-extra-bit
    #:dst-reg-index
