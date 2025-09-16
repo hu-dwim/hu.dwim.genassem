@@ -11,14 +11,14 @@
 (deftest form/raw ()
   (compare-with-external-assembler/x86
    '(((bits 64)
-      (_ret64)
-      (_hlt)
-      (_pause)
-      (_cmpsb)
-      (_cmpsl)
-      (_cmpsq)
-      (_cmpsw)
-      (_noop)
+      (ret64)
+      (hlt)
+      (pause)
+      (cmpsb)
+      (cmpsl)
+      (cmpsq)
+      (cmpsw)
+      (noop)
       "00000000  C3                ret
 00000001  F4                hlt
 00000002  F390              pause
@@ -29,16 +29,16 @@
 0000000A  90                nop
 ")
      ((bits 64)
-      (_enter #x1122 #xff)
-      (_adc64i32 #x11223344)
+      (enter #x1122 #xff)
+      (adc64i32 #x11223344)
       "00000000  C82211FF          enter 0x1122,0xff
 00000004  481544332211      adc rax,0x11223344
 ")
      ((bits 64)
-      (_cmpsb)
-      (_cmpsl)
-      (_cmpsq)
-      (_cmpsw)
+      (cmpsb)
+      (cmpsl)
+      (cmpsq)
+      (cmpsw)
       "00000000  A6                cmpsb
 00000001  A7                cmpsd
 00000002  48A7              cmpsq
@@ -49,8 +49,8 @@
 (deftest form/raw/calls ()
   (compare-with-external-assembler/x86
    '(((bits 64)
-      (_call64pcrel32 #x11223344)
-      (_call64pcrel32 #x-11223344)
+      (call64pcrel32 #x11223344)
+      (call64pcrel32 #x-11223344)
       "00000000  E844332211        call 0x11223349
 00000005  E8BCCCDDEE        call 0xffffffffeeddccc6
 ")
@@ -59,20 +59,20 @@
 (deftest form/immediate ()
   (compare-with-external-assembler/x86
    '(((bits 64)
-      (_cmp8i8   #x12)
-      (_cmp16i16 #x1122)
-      (_cmp32i32 #x11223344)
-      (_cmp64i32 #x11223344)
-      (_xor8i8   #x7f)
-      (_xor16i16 #x1122)
-      (_xor32i32 #x11223344)
-      (_xor64i32 #x11223344)
-      (_adc8i8   #x84)
-      (_adc8i8   #xff)
-      (_adc16i16 #x6677)
-      (_adc16i16 #xffff)
-      (_adc32i32 #x44556677)
-      (_adc32i32 #xffffffff)
+      (cmp8i8   #x12)
+      (cmp16i16 #x1122)
+      (cmp32i32 #x11223344)
+      (cmp64i32 #x11223344)
+      (xor8i8   #x7f)
+      (xor16i16 #x1122)
+      (xor32i32 #x11223344)
+      (xor64i32 #x11223344)
+      (adc8i8   #x84)
+      (adc8i8   #xff)
+      (adc16i16 #x6677)
+      (adc16i16 #xffff)
+      (adc32i32 #x44556677)
+      (adc32i32 #xffffffff)
       "00000000  3C12              cmp al,0x12
 00000002  663D2211          cmp ax,0x1122
 00000006  3D44332211        cmp eax,0x11223344
@@ -89,18 +89,18 @@
 00000033  15FFFFFFFF        adc eax,0xffffffff
 ")
      ((bits 64)
-      (_call64pcrel32 #x11223344)
+      (call64pcrel32 #x11223344)
       "00000000  E844332211        call 0x11223349
 "))))
 
 (deftest form/add-reg ()
   (compare-with-external-assembler/x86
    '(((bits 64)
-      (_bswap32r edx)
-      (_bswap64r rbx)
-      (_bswap64r r14)
-      (_bswap64r rsp)
-      (_mov16ri #x1122 bx)
+      (bswap32r edx)
+      (bswap64r rbx)
+      (bswap64r r14)
+      (bswap64r rsp)
+      (mov16ri #x1122 bx)
       "00000000  0FCA              bswap edx
 00000002  480FCB            bswap rbx
 00000005  490FCE            bswap r14
@@ -108,18 +108,18 @@
 0000000B  66BB2211          mov bx,0x1122
 ")
      ((bits 64)
-      (_mov16ri #x1122 bx)
+      (mov16ri #x1122 bx)
       "00000000  66BB2211          mov bx,0x1122
 "))))
 
 (deftest form/mrm/special-registers ()
   (compare-with-external-assembler/x86
    '(((bits 64)
-      (_mov64cr rcx cr3)
-      (_mov64cr rdx cr7)
-      (_mov64cr rax cr0)
-      (_mov64rc cr0 r15)
-      (_mov64rc cr1 r11)
+      (mov64cr rcx cr3)
+      (mov64cr rdx cr7)
+      (mov64cr rax cr0)
+      (mov64rc cr0 r15)
+      (mov64rc cr1 r11)
       "00000000  0F22D9            mov cr3,rcx
 00000003  0F22FA            mov cr7,rdx
 00000006  0F22C0            mov cr0,rax
@@ -130,16 +130,16 @@
 (deftest form/mrm ()
   (compare-with-external-assembler/x86
    '(((bits 64)
-      (_adc16ri #x1122 ax)
-      (_adc64ri32 #x11223344 rax)
-      (_adc64ri8 #x11 rbx)
-      (_adc64ri8 #x11 r15)
-      (_adc64ri8 #x11 rsi)
-      (_tpause ecx)
-      (_tpause edx)
-      (_test8i8 #x11)    ; same as next, but special encoding
-      (_test8ri #x11 al)
-      (_test8ri #x11 bl)
+      (adc16ri #x1122 ax)
+      (adc64ri32 #x11223344 rax)
+      (adc64ri8 #x11 rbx)
+      (adc64ri8 #x11 r15)
+      (adc64ri8 #x11 rsi)
+      (tpause ecx)
+      (tpause edx)
+      (test8i8 #x11)    ; same as next, but special encoding
+      (test8ri #x11 al)
+      (test8ri #x11 bl)
       "00000000  6681D02211        adc ax,0x1122
 00000005  4881D044332211    adc rax,0x11223344
 0000000C  4883D311          adc rbx,byte +0x11
@@ -156,14 +156,14 @@
 (deftest form/mrm/srcreg ()
   (compare-with-external-assembler/x86
    '(((bits 64)
-      (_adc8rr     bl dl)
-      (_adcx32rr   ebx eax)
-      (_adcx64rr   rcx r10)
-      (_add16rr    dx ax)
-      (_addpdrr    xmm0 xmm1)
-      (_addsubpdrr xmm4 xmm7)
-      (_adox64rr   r8 rax)
-      (_blendpdrri #x11 xmm1 xmm2)
+      (adc8rr     bl dl)
+      (adcx32rr   ebx eax)
+      (adcx64rr   rcx r10)
+      (add16rr    dx ax)
+      (addpdrr    xmm0 xmm1)
+      (addsubpdrr xmm4 xmm7)
+      (adox64rr   r8 rax)
+      (blendpdrri #x11 xmm1 xmm2)
       "00000000  10DA              adc dl,bl
 00000002  660F38F6C3        adcx eax,ebx
 00000007  664C0F38F6D1      adcx r10,rcx
@@ -177,14 +177,14 @@
 (deftest form/mrm/destreg ()
   (compare-with-external-assembler/x86
    '(((bits 64)
-      (_adc16rr bx ax)
-      (_mov64rr rax rbx)
-      (_mov64rr rax r15)
-      (_mov64rr r8 r14)
-      (_extractpsrri #x11 xmm7 eax)
-      (_extractpsrri #x11 xmm7 r15)
-      (_pextrbrri    #x11 xmm0 ebx)
-      (_pextrbrri    #x11 xmm7 edx)
+      (adc16rr bx ax)
+      (mov64rr rax rbx)
+      (mov64rr rax r15)
+      (mov64rr r8 r14)
+      (extractpsrri #x11 xmm7 eax)
+      (extractpsrri #x11 xmm7 r15)
+      (pextrbrri    #x11 xmm0 ebx)
+      (pextrbrri    #x11 xmm7 edx)
       "00000000  6611D8            adc ax,bx
 00000003  4889C3            mov rbx,rax
 00000006  4989C7            mov r15,rax
@@ -204,13 +204,13 @@
       ;; xed, and zydis (and probably other disassemblers) disassemble
       ;; it as ebx.
       (bits 64)
-      (_pextrbrri    #x11 xmm0 rbx)
+      (pextrbrri    #x11 xmm0 rbx)
       (bits 32)
-      (_pextrbrri    #x11 xmm0 ebx)
-      (_pextrbrri    #x11 xmm6 ebx)
+      (pextrbrri    #x11 xmm0 ebx)
+      (pextrbrri    #x11 xmm6 ebx)
       (bits 64)
-      (_pextrbrri    #x11 xmm6 rbx)
-      (_pextrbrri    #x11 xmm14 rbx)
+      (pextrbrri    #x11 xmm6 rbx)
+      (pextrbrri    #x11 xmm14 rbx)
       "00000000  660F3A14C311      pextrb ebx,xmm0,byte 0x11
 00000006  660F3A14C311      pextrb ebx,xmm0,byte 0x11
 0000000C  660F3A14F311      pextrb ebx,xmm6,byte 0x11
@@ -223,21 +223,21 @@
 ;; (deftest form/mrm/vex ()
 ;;   (compare-with-external-assembler/x86
 ;;    '(((bits 64)
-;;       (_blsi32rr edx ebx)
+;;       (blsi32rr edx ebx)
 ;;       "00000000  C4E260F3DA        blsi ebx,edx
 ;; "))))
 
 (deftest form/mrm/segment ()
   (compare-with-external-assembler/x86
    '(((bits 64)
-      (_mov16rs fs cx)
-      (_mov16rs gs bx)
-      (_mov16rs fs cx)
-      (_mov16rs es dx)
-      (_mov16sr cx fs)
-      (_mov16sr bx gs)
-      (_mov16sr cx fs)
-      (_mov16sr dx es)
+      (mov16rs fs cx)
+      (mov16rs gs bx)
+      (mov16rs fs cx)
+      (mov16rs es dx)
+      (mov16sr cx fs)
+      (mov16sr bx gs)
+      (mov16sr cx fs)
+      (mov16sr dx es)
       "00000000  668CE1            mov cx,fs
 00000003  668CEB            mov bx,gs
 00000006  668CE1            mov cx,fs
@@ -253,20 +253,20 @@
   (map nil (lambda (instr)
              (signals serious-condition
                (eval instr)))
-       '((_bswap32r r14)
-         (_bswap64r eax)
-         (_adc8i8 #x112)
-         (_adc16i16 #x112345678)
-         (_adc32i32 #x112345678)
-         (_enter #x11234 #x12)
-         (_enter #x1234 #x112)
+       '((bswap32r r14)
+         (bswap64r eax)
+         (adc8i8 #x112)
+         (adc16i16 #x112345678)
+         (adc32i32 #x112345678)
+         (enter #x11234 #x12)
+         (enter #x1234 #x112)
          ))
   (with-expected-failures
     (signals serious-condition
       (emit-assembly/x86
         (bits 64)
-        (_pextrbrri    #x11 xmm0 ebx)))
+        (pextrbrri    #x11 xmm0 ebx)))
     (signals serious-condition
       (emit-assembly/x86
         (bits 32)
-        (_pextrbrri    #x11 xmm0 rbx)))))
+        (pextrbrri    #x11 xmm0 rbx)))))

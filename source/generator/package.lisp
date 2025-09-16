@@ -27,6 +27,7 @@
         :hu.dwim.genassem
         :hu.dwim.genassem/asm-common
         :hu.dwim.genassem/x86
+        :hu.dwim.genassem/x86/functional
         :metabang-bind)
   (:export
    #:generate-assembler/x86_64

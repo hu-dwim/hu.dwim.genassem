@@ -34,13 +34,18 @@
         )
   (:export
    #:decode-register
-   #:register-name->encoding/segment
-   #:register-name->encoding/gr8
-   #:register-name->encoding/gr16
-   #:register-name->encoding/gr32
-   #:register-name->encoding/gr64
    #:maybe-emit-operand-size-prefix
+   #:emit-imm
+   ))
 
+(uiop:define-package :hu.dwim.genassem/x86/functional
+  (:use :alexandria
+        :anaphora
+        :common-lisp
+        :hu.dwim.genassem/asm-common
+        :hu.dwim.genassem/x86
+        )
+  (:export
    ;; these are only exported so that the output is not filled with pkg:: prefixes
    #:rex.w-part
 
@@ -48,6 +53,4 @@
    #:dst-reg-index
    #:src-reg-extra-bit
    #:src-reg-index
-
-   #:emit-imm
    ))

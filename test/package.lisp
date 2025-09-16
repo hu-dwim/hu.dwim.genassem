@@ -13,6 +13,7 @@
         :hu.dwim.stefil
         :hu.dwim.genassem/asm-common
         :hu.dwim.genassem/x86
+        :hu.dwim.genassem/x86/functional
         )
   (:export
    #:test

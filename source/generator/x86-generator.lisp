@@ -11,8 +11,13 @@
 (define-constant rex.x #x02)
 (define-constant rex.b #x01)
 
-(defun needs-operand-size-prefix? (op-size)
-  (eq op-size :|OpSize16|))
+(defun may-have-operand-size-prefix? (op-size)
+  (ecase op-size
+    ((:|OpSize16|)
+     t)
+    ((:|OpSize32|
+      :|OpSizeFixed|)
+     nil)))
 
 ;; TODO drop the unused single-match? complexity
 (defmacro map-params! ((params &key (single-match? nil)) &body body)
@@ -170,7 +175,7 @@
          ))
       `(define-instruction ,name ,(mapcar 'car parameters)
          ,@(emit-bytes-form prefix-and-rex)
-         ,@(when (needs-operand-size-prefix? op-size)
+         ,@(when (may-have-operand-size-prefix? op-size)
              '((maybe-emit-operand-size-prefix)))
          ,@(emit-bytes-form opcode-part)
          ;; emit immediates, if any
@@ -194,7 +199,7 @@
              ;; TODO how come rex is nil here for e.g. bswap32r?
              (emit-byte (logior ,(or rex (logior #x40 rex.w))
                                 (if dst-reg-extra-bit ,rex.b 0))))
-           ,@(when (needs-operand-size-prefix? op-size)
+           ,@(when (may-have-operand-size-prefix? op-size)
                '((maybe-emit-operand-size-prefix)))
            ,@(emit-bytes-form opcode-prefix-bytes)
            (emit-byte (logior ',opcode dst-reg-index))
@@ -287,7 +292,7 @@
                                      (if dst-reg-extra-bit ,rex.b 0)
                                      ,@(when src-reg
                                          `((if src-reg-extra-bit ,rex.r 0)))))))
-              ,@(when (needs-operand-size-prefix? op-size)
+              ,@(when (may-have-operand-size-prefix? op-size)
                   '((maybe-emit-operand-size-prefix)))
               ,@(emit-bytes-form opcode-prefix-bytes)
               (emit-byte ',opcode)
@@ -306,12 +311,15 @@
                   op-prefix             ;op-prefix/explicit
                   form-category has-position-order
                   &allow-other-keys) instr)
-           (lisp-name (intern/asm (concatenate 'string "_" name)))
+           (lisp-name (intern/asm (if (find-symbol name :common-lisp)
+                                      ;; clases with CL:LOOP
+                                      (concatenate 'string "_" name)
+                                      name)))
            (prefix-bytes ())
            (opcode-prefix-bytes ())
            (rex (when has-rex.w
                   (logior #x40 rex.w)))
-           (*package* (find-package :hu.dwim.genassem/x86))
+           (*package* (find-package :hu.dwim.genassem/x86/functional))
            ;; normalize the param types to our clos classes
            ;; representing the various register classes
            (parameters
@@ -419,7 +427,7 @@
    '(cons (eql define-instruction))
    (pprint-dispatch '(defun x (y)))))
 
-(defun generate-assembler/x86_64 (&key (package :hu.dwim.genassem/x86))
+(defun generate-assembler/x86_64 (&key (package :hu.dwim.genassem/x86/functional))
   (unless (packagep package)
     (setf package (find-package package)))
   (with-output-to-file
