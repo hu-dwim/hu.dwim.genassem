@@ -33,7 +33,8 @@
         :hu.dwim.genassem/asm-common
         )
   (:export
-   #:decode-register
+   #:index-of
+   #:decode-register ; TODO delme
    #:maybe-emit-operand-size-prefix
    #:emit-imm
    ))

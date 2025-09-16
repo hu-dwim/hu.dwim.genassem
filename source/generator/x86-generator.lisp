@@ -205,6 +205,22 @@
            (emit-byte (logior ',opcode dst-reg-index))
            ,@(emit-imm-forms parameters))))))
 
+(defun operand-type-declarations (&rest regs-and-types)
+  `(declare
+    ,@(loop :for entry :in regs-and-types
+            :while entry
+            :for (reg . type) = entry
+            :collect `(type ,(ecase type
+                               (:|GR32orGR64|
+                                '(or gr32 gr64))
+                               (:|GR16orGR32orGR64|
+                                '(or gr16 gr32 gr64))
+                               ((gr8 gr16 gr32 gr64
+                                     vr64 vr128 vr512 vr256
+                                     st cr dr sr)
+                                type))
+                            ,reg))))
+
 (defun form/mrm (instr name prefix-bytes opcode-prefix-bytes opcode)
   (destructuring-bind (&key form op-size has-rex.w
                          parameters &allow-other-keys)
@@ -268,42 +284,46 @@
       (let ((dst-reg  (car dst-reg-param))
             (dst-type (cdr dst-reg-param))
             (src-reg  (car src-reg-param))
-            (src-type (cdr src-reg-param)))
+            ;;(src-type (cdr src-reg-param))
+            )
         `(define-instruction ,name ,(mapcar 'car (getf instr :parameters))
-           (multiple-value-bind (dst-reg-index dst-reg-extra-bit)
-               (decode-register ,dst-reg ,dst-type)
-             (,@(if src-reg
-                    `(multiple-value-bind (src-reg-index src-reg-extra-bit)
-                         (decode-register ,src-reg ,src-type))
-                    '(progn))
-              ,@(emit-bytes-form prefix-bytes)
-              ,@(when (may-have-operand-size-prefix? op-size)
-                  '((maybe-emit-operand-size-prefix)))
-              ;; REX
-              (let (,@(when has-rex.w
-                        `((rex.w-part ,(if (eq dst-type 'gr64)
-                                           rex.w
-                                           `(if (typep ,dst-reg 'gr64)
-                                                ,rex.w
-                                                0))))))
-                (when (or ,@(when has-rex.w
-                              (if (eq dst-type 'gr64)
-                                  '(t)
-                                  '((not (zerop rex.w-part)))))
-                          dst-reg-extra-bit
-                          ,@(when src-reg
-                              '(src-reg-extra-bit)))
-                  (emit-byte (logior #x40 ,@(when has-rex.w
-                                              '(rex.w-part))
-                                     (if dst-reg-extra-bit ,rex.b 0)
-                                     ,@(when src-reg
-                                         `((if src-reg-extra-bit ,rex.r 0)))))))
-              ,@(emit-bytes-form opcode-prefix-bytes)
-              (emit-byte ',opcode)
-              (emit-byte (logior ',modrm dst-reg-index ; modrm.r/m
-                                 ,@(when src-reg
-                                     `((ash src-reg-index 3))))) ; modrm.reg
-              ,@(emit-imm-forms parameters))))))))
+           ,(operand-type-declarations dst-reg-param src-reg-param)
+           (let ((dst-reg-index (index-of ,dst-reg))
+                 ,@(when src-reg
+                     `((src-reg-index (index-of ,src-reg)))))
+             (declare (type (integer 0 15) dst-reg-index ,@(when src-reg '(src-reg-index))))
+             ,@(emit-bytes-form prefix-bytes)
+             ,@(when (may-have-operand-size-prefix? op-size)
+                 '((maybe-emit-operand-size-prefix)))
+             ;; REX
+             (let (,@(when has-rex.w
+                       `((rex.w-part ,(if (eq dst-type 'gr64)
+                                          rex.w
+                                          `(if (typep ,dst-reg 'gr64)
+                                               ,rex.w
+                                               0)))))
+                   (dst-reg-extra-bit (when (< 7 dst-reg-index)
+                                        ,rex.b))
+                   ,@(when src-reg `((src-reg-extra-bit (when (< 7 src-reg-index)
+                                                          ,rex.r)))))
+               (when (or ,@(when has-rex.w
+                             (if (eq dst-type 'gr64)
+                                 '(t)
+                                 '((not (zerop rex.w-part)))))
+                         dst-reg-extra-bit
+                         ,@(when src-reg
+                             '(src-reg-extra-bit)))
+                 (emit-byte (logior #x40 ,@(when has-rex.w
+                                             '(rex.w-part))
+                                    (or dst-reg-extra-bit 0)
+                                    ,@(when src-reg
+                                        `((or src-reg-extra-bit 0)))))))
+             ,@(emit-bytes-form opcode-prefix-bytes)
+             (emit-byte ',opcode)
+             (emit-byte (logior ',modrm (logand dst-reg-index #b111) ; modrm.r/m
+                                ,@(when src-reg
+                                    `((ash (logand src-reg-index #b111) 3))))) ; modrm.reg
+             ,@(emit-imm-forms parameters)))))))
 
 (defun skip-instruction ()
   (throw :skip-instruction nil))
@@ -338,7 +358,7 @@
                                      ((:gr8 :gr16 :gr32 :gr64
                                        :vr64 :vr128 :vr512 :vr256)
                                       (aprog1
-                                          (find-symbol (symbol-name type) *package*)
+                                          (find-symbol (symbol-name type) (find-package :hu.dwim.genassem/x86))
                                         (assert it)))
                                      (otherwise type)))))
                     parameters))
