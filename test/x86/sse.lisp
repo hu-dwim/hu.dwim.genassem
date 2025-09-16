@@ -10,7 +10,6 @@
 
 (deftest sse/1 ()
   (compare-with-external-assembler/x86
-   '(((bits 64)
-      (comissrr xmm2 xmm3)
+   '(((comissrr xmm2 xmm3)
       "00000000  0F2FDA            comiss xmm3,xmm2
 "))))

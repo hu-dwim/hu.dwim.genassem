@@ -10,8 +10,7 @@
 
 (deftest x87/mrm/1 ()
   (compare-with-external-assembler/x86
-   '(((bits 64)
-      (mul_fprst0 st3)
+   '(((mul_fprst0 st3)
       (subr_fprst0 st7)
       (subr_fst0r st1)
       "00000000  DECB              fmulp st3

@@ -10,8 +10,7 @@
 
 (deftest form/raw ()
   (compare-with-external-assembler/x86
-   '(((bits 64)
-      (ret64)
+   '(((ret64)
       (hlt)
       (pause)
       (cmpsb)
@@ -28,14 +27,12 @@
 00000008  66A7              cmpsw
 0000000A  90                nop
 ")
-     ((bits 64)
-      (enter #x1122 #xff)
+     ((enter #x1122 #xff)
       (adc64i32 #x11223344)
       "00000000  C82211FF          enter 0x1122,0xff
 00000004  481544332211      adc rax,0x11223344
 ")
-     ((bits 64)
-      (cmpsb)
+     ((cmpsb)
       (cmpsl)
       (cmpsq)
       (cmpsw)
@@ -48,8 +45,7 @@
 
 (deftest form/raw/calls ()
   (compare-with-external-assembler/x86
-   '(((bits 64)
-      (call64pcrel32 #x11223344)
+   '(((call64pcrel32 #x11223344)
       (call64pcrel32 #x-11223344)
       "00000000  E844332211        call 0x11223349
 00000005  E8BCCCDDEE        call 0xffffffffeeddccc6
@@ -58,45 +54,51 @@
 
 (deftest form/immediate ()
   (compare-with-external-assembler/x86
-   '(((bits 64)
-      (cmp8i8   #x12)
-      (cmp16i16 #x1122)
-      (cmp32i32 #x11223344)
-      (cmp64i32 #x11223344)
-      (xor8i8   #x7f)
-      (xor16i16 #x1122)
-      (xor32i32 #x11223344)
-      (xor64i32 #x11223344)
-      (adc8i8   #x84)
+   '(((adc8i8   #x84)
       (adc8i8   #xff)
       (adc16i16 #x6677)
       (adc16i16 #xffff)
       (adc32i32 #x44556677)
       (adc32i32 #xffffffff)
+      "00000000  1484              adc al,0x84
+00000002  14FF              adc al,0xff
+00000004  66157766          adc ax,0x6677
+00000008  6615FFFF          adc ax,0xffff
+0000000C  1577665544        adc eax,0x44556677
+00000011  15FFFFFFFF        adc eax,0xffffffff
+")
+
+     ((xor8i8   #x7f)
+      (xor16i16 #x1122)
+      (xor32i32 #x11223344)
+      (xor64i32 #x11223344)
+      "00000000  347F              xor al,0x7f
+00000002  66352211          xor ax,0x1122
+00000006  3544332211        xor eax,0x11223344
+0000000B  483544332211      xor rax,0x11223344
+")
+
+     ((cmp8i8   #x12)
+      (cmp16i16 #x1122)
+      (cmp32i32 #x11223344)
+      (cmp64i32 #x11223344)
       "00000000  3C12              cmp al,0x12
 00000002  663D2211          cmp ax,0x1122
 00000006  3D44332211        cmp eax,0x11223344
 0000000B  483D44332211      cmp rax,0x11223344
-00000011  347F              xor al,0x7f
-00000013  66352211          xor ax,0x1122
-00000017  3544332211        xor eax,0x11223344
-0000001C  483544332211      xor rax,0x11223344
-00000022  1484              adc al,0x84
-00000024  14FF              adc al,0xff
-00000026  66157766          adc ax,0x6677
-0000002A  6615FFFF          adc ax,0xffff
-0000002E  1577665544        adc eax,0x44556677
-00000033  15FFFFFFFF        adc eax,0xffffffff
 ")
-     ((bits 64)
-      (call64pcrel32 #x11223344)
+     ((call64pcrel32 #x11223344)
       "00000000  E844332211        call 0x11223349
+")
+     ((adc32ri   #x11223344 ebx)
+      (adc64ri32 #x11223344 rbx)
+      "00000000  81D344332211      adc ebx,0x11223344
+00000006  4881D344332211    adc rbx,0x11223344
 "))))
 
 (deftest form/add-reg ()
   (compare-with-external-assembler/x86
-   '(((bits 64)
-      (bswap32r edx)
+   '(((bswap32r edx)
       (bswap64r rbx)
       (bswap64r r14)
       (bswap64r rsp)
@@ -107,15 +109,13 @@
 00000008  480FCC            bswap rsp
 0000000B  66BB2211          mov bx,0x1122
 ")
-     ((bits 64)
-      (mov16ri #x1122 bx)
+     ((mov16ri #x1122 bx)
       "00000000  66BB2211          mov bx,0x1122
 "))))
 
 (deftest form/mrm/special-registers ()
   (compare-with-external-assembler/x86
-   '(((bits 64)
-      (mov64cr rcx cr3)
+   '(((mov64cr rcx cr3)
       (mov64cr rdx cr7)
       (mov64cr rax cr0)
       (mov64rc cr0 r15)
@@ -129,34 +129,34 @@
 
 (deftest form/mrm ()
   (compare-with-external-assembler/x86
-   '(((bits 64)
-      (adc16ri #x1122 ax)
+   '(((adc16ri #x1122 ax)
       (adc64ri32 #x11223344 rax)
       (adc64ri8 #x11 rbx)
       (adc64ri8 #x11 r15)
       (adc64ri8 #x11 rsi)
-      (tpause ecx)
-      (tpause edx)
-      (test8i8 #x11)    ; same as next, but special encoding
-      (test8ri #x11 al)
-      (test8ri #x11 bl)
       "00000000  6681D02211        adc ax,0x1122
 00000005  4881D044332211    adc rax,0x11223344
 0000000C  4883D311          adc rbx,byte +0x11
 00000010  4983D711          adc r15,byte +0x11
 00000014  4883D611          adc rsi,byte +0x11
-00000018  660FAEF1          tpause ecx
-0000001C  660FAEF2          tpause edx
-00000020  A811              test al,0x11
-00000022  F6C011            test al,0x11
-00000025  F6C311            test bl,0x11
+")
+     ((tpause ecx)
+      (tpause edx)
+      "00000000  660FAEF1          tpause ecx
+00000004  660FAEF2          tpause edx
+")
+     ((test8i8 #x11)    ; same as next, but special encoding
+      (test8ri #x11 al)
+      (test8ri #x11 bl)
+      "00000000  A811              test al,0x11
+00000002  F6C011            test al,0x11
+00000005  F6C311            test bl,0x11
 ")
      )))
 
 (deftest form/mrm/srcreg ()
   (compare-with-external-assembler/x86
-   '(((bits 64)
-      (adc8rr     bl dl)
+   '(((adc8rr     bl dl)
       (adcx32rr   ebx eax)
       (adcx64rr   rcx r10)
       (add16rr    dx ax)
@@ -176,8 +176,7 @@
 
 (deftest form/mrm/destreg ()
   (compare-with-external-assembler/x86
-   '(((bits 64)
-      (adc16rr bx ax)
+   '(((adc16rr bx ax)
       (mov64rr rax rbx)
       (mov64rr rax r15)
       (mov64rr r8 r14)
@@ -222,15 +221,14 @@
 ;; TODO
 ;; (deftest form/mrm/vex ()
 ;;   (compare-with-external-assembler/x86
-;;    '(((bits 64)
+;;    '((
 ;;       (blsi32rr edx ebx)
 ;;       "00000000  C4E260F3DA        blsi ebx,edx
 ;; "))))
 
 (deftest form/mrm/segment ()
   (compare-with-external-assembler/x86
-   '(((bits 64)
-      (mov16rs fs cx)
+   '(((mov16rs fs cx)
       (mov16rs gs bx)
       (mov16rs fs cx)
       (mov16rs es dx)
