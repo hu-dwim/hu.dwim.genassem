@@ -277,6 +277,8 @@
                          (decode-register ,src-reg ,src-type))
                     '(progn))
               ,@(emit-bytes-form prefix-bytes)
+              ,@(when (may-have-operand-size-prefix? op-size)
+                  '((maybe-emit-operand-size-prefix)))
               ;; REX
               (let (,@(when has-rex.w
                         `((rex.w-part (if (typep ,dst-reg 'gr64)
@@ -292,8 +294,6 @@
                                      (if dst-reg-extra-bit ,rex.b 0)
                                      ,@(when src-reg
                                          `((if src-reg-extra-bit ,rex.r 0)))))))
-              ,@(when (may-have-operand-size-prefix? op-size)
-                  '((maybe-emit-operand-size-prefix)))
               ,@(emit-bytes-form opcode-prefix-bytes)
               (emit-byte ',opcode)
               (emit-byte (logior ',modrm dst-reg-index ; modrm.r/m

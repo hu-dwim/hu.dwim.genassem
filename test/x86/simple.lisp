@@ -130,15 +130,18 @@
 (deftest form/mrm ()
   (compare-with-external-assembler/x86
    '(((adc16ri #x1122 ax)
-      (adc64ri32 #x11223344 rax)
+      (adc16ri #x1122 r11w)
+      "00000000  6681D02211        adc ax,0x1122
+00000005  664181D32211      adc r11w,0x1122
+")
+     ((adc64ri32 #x11223344 rax)
       (adc64ri8 #x11 rbx)
       (adc64ri8 #x11 r15)
       (adc64ri8 #x11 rsi)
-      "00000000  6681D02211        adc ax,0x1122
-00000005  4881D044332211    adc rax,0x11223344
-0000000C  4883D311          adc rbx,byte +0x11
-00000010  4983D711          adc r15,byte +0x11
-00000014  4883D611          adc rsi,byte +0x11
+      "00000000  4881D044332211    adc rax,0x11223344
+00000007  4883D311          adc rbx,byte +0x11
+0000000B  4983D711          adc r15,byte +0x11
+0000000F  4883D611          adc rsi,byte +0x11
 ")
      ((tpause ecx)
       (tpause edx)
@@ -172,6 +175,36 @@
 00000014  660FD0FC          addsubpd xmm7,xmm4
 00000018  F3490F38F6C0      adox rax,r8
 0000001E  660F3A0DD111      blendpd xmm2,xmm1,byte 0x11
+"))))
+
+(deftest form/mrm/srcreg/16or32or64 ()
+  (compare-with-external-assembler/x86
+   '(((lar16rr     bx dx)
+      (lar16rr     ebx dx) ; TODO is this what we want?
+      (lar16rr     rbx dx) ; ?
+      (lar16rr     r10 r11w) ; ?
+      "00000000  660F02D3          lar dx,bx
+00000004  660F02D3          lar dx,bx
+00000008  660F02D3          lar dx,bx
+0000000C  66450F02DA        lar r11w,r10w
+")
+     ((lar32rr     bx  edx)
+      (lar32rr     ebx edx) ; TODO ?
+      (lar32rr     rbx edx) ; ?
+      (lar32rr     r10 r11d) ; ?
+      "00000000  0F02D3            lar edx,bx
+00000003  0F02D3            lar edx,bx
+00000006  0F02D3            lar edx,bx
+00000009  450F02DA          lar r11d,r10w
+")
+     ((lar64rr     bx  rdx)
+      (lar64rr     ebx rdx) ; TODO ?
+      (lar64rr     rbx rdx) ; ?
+      (lar64rr     r10 r11) ; ?
+      "00000000  0F02D3            lar edx,bx
+00000003  0F02D3            lar edx,bx
+00000006  480F02D3          lar rdx,bx
+0000000A  4D0F02DA          lar r11,r10w
 "))))
 
 (deftest form/mrm/destreg ()
