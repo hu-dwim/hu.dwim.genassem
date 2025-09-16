@@ -231,10 +231,10 @@
 (deftest form/mrm/destreg/bug/1 ()
   (compare-with-external-assembler/x86
    '((;; the PEXTRBrri instruction operates on the low 8 bits of the
-      ;; register, but the register encoded just like a GR32 or GR64
-      ;; into the machine code. in practice this means that ndisasm,
-      ;; xed, and zydis (and probably other disassemblers) disassemble
-      ;; it as ebx.
+      ;; register, but the register is encoded just like a GR32 or a
+      ;; GR64 into the machine code. in practice this means that
+      ;; ndisasm, xed, and zydis (and probably other disassemblers)
+      ;; disassemble it always as ebx, not rbx.
       (bits 64)
       (pextrbrri    #x11 xmm0 rbx)
       (bits 32)
@@ -280,7 +280,8 @@
 "))))
 
 (deftest invalids ()
-  ;; TODO these should check for more specific error types
+  ;; TODO these should check for more specific error types. but then
+  ;; most errors are now cl type errors.
   (map nil (lambda (instr)
              (signals serious-condition
                (eval instr)))
@@ -292,12 +293,14 @@
          (enter #x11234 #x12)
          (enter #x1234 #x112)
          ))
-  (with-expected-failures
-    (signals serious-condition
-      (emit-assembly/x86
-        (bits 64)
-        (pextrbrri    #x11 xmm0 ebx)))
-    (signals serious-condition
-      (emit-assembly/x86
-        (bits 32)
-        (pextrbrri    #x11 xmm0 rbx)))))
+  ;; TODO i'm not sure how to handle those GR32orGR64 types...
+  ;; (with-expected-failures
+  ;;   (signals serious-condition
+  ;;     (emit-assembly/x86
+  ;;       (bits 64)
+  ;;       (pextrbrri    #x11 xmm0 ebx)))
+  ;;   (signals serious-condition
+  ;;     (emit-assembly/x86
+  ;;       (bits 32)
+  ;;       (pextrbrri    #x11 xmm0 rbx))))
+  )

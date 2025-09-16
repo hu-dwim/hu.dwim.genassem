@@ -34,7 +34,7 @@
    )
   (:shadowing-import-from
    :hu.dwim.genassem/x86
-   ;; these are used as symbols instead of the tablegen names (see normalize-instruction)
+   ;; these are used as symbols in place of the tablegen names (see normalize-instruction)
    #:gr8 #:gr16 #:gr32 #:gr64
    #:vr64 #:vr128 #:vr256 #:vr512
    #:st #:sr #:cr #:dr

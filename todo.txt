@@ -29,6 +29,14 @@ https://github.com/marcoheisig/fast-generic-functions
 
 https://github.com/alex-gutev/static-dispatch
 obsolete: https://github.com/guicho271828/inlined-generic-function
+** #package #namespace clashes with :common-lisp
+("push" "pop" "or" "not" "loop" "and")
+
+and a single cl:loop for the functional dumb interface
+
+i'm leaning toward not prefixing _loop and the others, and forcing
+users to :shadowing-import-from the symbols they want in their
+packages.
 * features
 ** partition instructions by microarchitecture levels?
 or maybe add the predicates to the asm-context for runtime checks?

@@ -159,6 +159,23 @@
     (when parameters
       (format *error-output* "TODO: some operands have remained unprocessed: ~A~%" parameters))))
 
+(defun operand-type-declarations (&rest regs-and-types)
+  `(declare
+    (optimize (speed 3))
+    ,@(loop :for entry :in regs-and-types
+            :while entry
+            :for (reg . type) = entry
+            :collect `(type ,(ecase type
+                               (:|GR32orGR64|
+                                '(or gr32 gr64))
+                               (:|GR16orGR32orGR64|
+                                '(or gr16 gr32 gr64))
+                               ((gr8 gr16 gr32 gr64
+                                     vr64 vr128 vr512 vr256
+                                     st cr dr sr)
+                                type))
+                            ,reg))))
+
 (defun form/raw (instr name prefix-bytes opcode-prefix-bytes opcode)
   (destructuring-bind (&key form op-size has-rex.w parameters
                        &allow-other-keys)
@@ -187,24 +204,7 @@
          ,@(when (may-have-operand-size-prefix? op-size)
              '((maybe-emit-operand-size-prefix)))
          ,@(emit-bytes-form opcode-part)
-         ;; emit immediates, if any
          ,@(emit-imm-forms parameters)))))
-
-(defun operand-type-declarations (&rest regs-and-types)
-  `(declare
-    ,@(loop :for entry :in regs-and-types
-            :while entry
-            :for (reg . type) = entry
-            :collect `(type ,(ecase type
-                               (:|GR32orGR64|
-                                '(or gr32 gr64))
-                               (:|GR16orGR32orGR64|
-                                '(or gr16 gr32 gr64))
-                               ((gr8 gr16 gr32 gr64
-                                     vr64 vr128 vr512 vr256
-                                     st cr dr sr)
-                                type))
-                            ,reg))))
 
 (defun form/mrm (instr name prefix-bytes opcode-prefix-bytes opcode)
   (destructuring-bind (&key form op-size has-rex.w
@@ -243,7 +243,7 @@
 ;;;
 ;;; MRMSrcReg
 ;;;
-        ((equal form-str "MRMSrcReg")
+        ((eq form :|MRMSrcReg|)
          ;; source:      mrm.reg, rex.r
          ;; destination: mrm.r/m, rex.b
          (setf (ldb (byte 2 6) modrm) #b11)
@@ -253,7 +253,7 @@
 ;;;
 ;;; MRMDestReg
 ;;;
-        ((equal form-str "MRMDestReg")
+        ((eq form :|MRMDestReg|)
          ;; source:      mrm.r/m, rex.b
          ;; destination: mrm.reg, rex.r
          (setf (ldb (byte 2 6) modrm) #b11)
@@ -401,7 +401,9 @@
           ;;   (break))
           (ecase form-category
             (:raw
-             ;; RawFrm specifically means raw form: the instruction has no special ModR/M or opcode map handling—it’s just a fixed sequence of bytes.
+             ;; RawFrm specifically means raw form: the instruction
+             ;; has no special ModR/M or opcode map handling—it’s just
+             ;; a fixed sequence of bytes.
              (emit-asm-form
               (form/raw instr
                         lisp-name
