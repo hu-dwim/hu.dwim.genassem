@@ -190,30 +190,6 @@
          ;; emit immediates, if any
          ,@(emit-imm-forms parameters)))))
 
-(defun form/add-reg (instr name rex prefix-bytes opcode-prefix-bytes opcode)
-  (destructuring-bind (&key op-size     ; inputs outputs
-                         parameters &allow-other-keys)
-      instr
-    (let* ((dst-reg-param (pop-reg-param! parameters))
-           (dst-reg  (car dst-reg-param))
-           (dst-type (cdr dst-reg-param)))
-      (assert dst-reg-param)
-      `(define-instruction ,name ,(mapcar 'car (getf instr :parameters))
-         (multiple-value-bind (dst-reg-index dst-reg-extra-bit)
-             (decode-register ,dst-reg ,dst-type)
-           ,@(emit-bytes-form prefix-bytes)
-           ;; TODO OPTIMIZATION: sometimes this typep is known to
-           ;; be false at generation time; add a dispatch to it.
-           (when (typep ,dst-reg 'gr64)
-             ;; TODO how come rex is nil here for e.g. bswap32r?
-             (emit-byte (logior ,(or rex (logior #x40 rex.w))
-                                (if dst-reg-extra-bit ,rex.b 0))))
-           ,@(when (may-have-operand-size-prefix? op-size)
-               '((maybe-emit-operand-size-prefix)))
-           ,@(emit-bytes-form opcode-prefix-bytes)
-           (emit-byte (logior ',opcode dst-reg-index))
-           ,@(emit-imm-forms parameters))))))
-
 (defun operand-type-declarations (&rest regs-and-types)
   `(declare
     ,@(loop :for entry :in regs-and-types
@@ -284,6 +260,9 @@
          (setf src-reg-param (pop-reg-param! parameters))
          (setf dst-reg-param (pop-reg-param! parameters)))
 
+        ((eq form :|AddRegFrm|)
+         (setf dst-reg-param (pop-reg-param! parameters)))
+
         (t
          ;; TODO
          (skip-instruction)
@@ -322,10 +301,12 @@
                     `(unless (eql rex #x40)
                        (emit-byte rex))))
              ,@(emit-bytes-form opcode-prefix-bytes)
-             (emit-byte ',opcode)
-             (emit-byte (logior ',modrm (logand dst-reg-index #b111) ; modrm.r/m
-                                ,@(when src-reg
-                                    `((ash (logand src-reg-index #b111) 3))))) ; modrm.reg
+             ,@(if (eq form :|AddRegFrm|)
+                   `((emit-byte (logior ',opcode dst-reg-index)))
+                   `((emit-byte ',opcode)
+                     (emit-byte (logior ',modrm (logand dst-reg-index #b111) ; modrm.r/m
+                                        ,@(when src-reg
+                                            `((ash (logand src-reg-index #b111) 3))))))) ; modrm.reg
              ,@(emit-imm-forms parameters)))))))
 
 (defun skip-instruction ()
@@ -431,16 +412,7 @@
                         (nreverse opcode-prefix-bytes)
                         opcode))
              lisp-name)
-            (:add-reg
-             (emit-asm-form
-              (form/add-reg instr
-                            lisp-name
-                            rex
-                            (nreverse prefix-bytes)
-                            (nreverse opcode-prefix-bytes)
-                            opcode))
-             lisp-name)
-            (:mrm
+            ((:add-reg :mrm)
              (emit-asm-form
               (form/mrm instr
                         lisp-name
