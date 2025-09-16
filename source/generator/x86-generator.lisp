@@ -281,11 +281,15 @@
                   '((maybe-emit-operand-size-prefix)))
               ;; REX
               (let (,@(when has-rex.w
-                        `((rex.w-part (if (typep ,dst-reg 'gr64)
-                                          ,rex.w
-                                          0)))))
+                        `((rex.w-part ,(if (eq dst-type 'gr64)
+                                           rex.w
+                                           `(if (typep ,dst-reg 'gr64)
+                                                ,rex.w
+                                                0))))))
                 (when (or ,@(when has-rex.w
-                              '((not (zerop rex.w-part))))
+                              (if (eq dst-type 'gr64)
+                                  '(t)
+                                  '((not (zerop rex.w-part)))))
                           dst-reg-extra-bit
                           ,@(when src-reg
                               '(src-reg-extra-bit)))
